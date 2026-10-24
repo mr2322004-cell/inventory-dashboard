@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
@@ -58,7 +57,7 @@ if uploaded_file is not None:
       # تبويبات مفصلة بالكامل
       tab1, tab2, tab3, tab4 = st.tabs([
           "📋 كل البيانات",
-          "📉 تفاصيل العجز (الواضح)",
+          "📉 تفاصيل العجز (النقص)",
           "➕ تفاصيل الزيادة",
           "🔍 بحث وفلترة متقدمة",
       ])
@@ -71,7 +70,6 @@ if uploaded_file is not None:
         st.subheader("⚠️ الأصناف التي بها عجز (نقص في المخزون)")
         st.metric("عدد أصناف العجز", len(shortage_df))
         st.dataframe(shortage_df, use_container_width=True)
-        # زر تحميل العجز
         st.download_button(
             "📥 تحميل تقرير العجز فقط (CSV)",
             shortage_df.to_csv(index=False).encode("utf-8"),
@@ -83,7 +81,6 @@ if uploaded_file is not None:
         st.subheader("➕ الأصناف التي بها زيادة في المخزون")
         st.metric("عدد أصناف الزيادة", len(excess_df))
         st.dataframe(excess_df, use_container_width=True)
-        # زر تحميل الزيادة
         st.download_button(
             "📥 تحميل تقرير الزيادة فقط (CSV)",
             excess_df.to_csv(index=False).encode("utf-8"),
@@ -111,6 +108,6 @@ if uploaded_file is not None:
       st.error("عمود 'Difference' غير موجود في الملف، تأكد من مطابقة أسماء الأعمدة.")
 
   except Exception as e:
-    st.error(fحدث خطأ أثناء المعالجة: {e})
+    st.error(f"حدث خطأ أثناء المعالجة: {e}")
 else:
   st.info("👈 يرجى رفع ملف الإكسيل المجمع لعرض التحليل المفصل بالكامل.")
