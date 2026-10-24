@@ -27,21 +27,27 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 st.title("📦 متابعة محمد قطان - تقارير الجرد والفروقات والتحليل المتقدم")
 st.caption("تقارير دقيقة ومفصلة لشهر سبتمبر وأكتوبر (الموجب عجز / السالب زيادة)")
 
-uploaded_file = st.file_uploader("📁 ارفع ملف الإكسيل المجمع هنا", type=["xlsx", "xls", "csv"])
+# محاولة تحميل الملف تلقائياً من المستودع أو السماح برفعه يدويًا كخيار احتياطي
+@st.cache_data
+def load_default_data():
+    try:
+        # ضع هنا اسم ملف الإكسيل الموجود في جيت هاب بدقة (مثلاً report.xlsx أو تقرير شهرين.xlsx)
+        return pd.read_excel("تقرير شهرين.xlsx")
+    except:
+        return None
+
+df = load_default_data()
+
+uploaded_file = st.file_uploader("📁 أو ارفع ملف الإكسيل يدوياً من هنا (اختياري)", type=["xlsx", "xls", "csv"])
 
 if uploaded_file is not None:
-    try:
-        if uploaded_file.name.endswith(".csv"):
-            df = pd.read_csv(uploaded_file, encoding="utf-8-sig")
-        else:
-            excel_file = pd.ExcelFile(uploaded_file)
-            sheet_name = excel_file.sheet_names[0]
-            for s in excel_file.sheet_names:
-                if "9" in s or "10" in s:
-                    sheet_name = s
-                    break
-            df = pd.read_excel(excel_file, sheet_name=sheet_name)
+    if uploaded_file.name.endswith(".csv"):
+        df = pd.read_csv(uploaded_file, encoding="utf-8-sig")
+    else:
+        df = pd.read_excel(uploaded_file)
 
+if df is not None:
+    try:
         # استخراج الشهر بدقة من تواريخ الملف
         date_col = None
         for col in df.columns:
@@ -133,8 +139,6 @@ if uploaded_file is not None:
 
         with tab1:
             st.subheader("🔥 أعلى 30 صنف بها عجز ونقص (أكثر الأصناف استنزافاً)")
-            
-            # اختيار الشهر أو عرض الكل لأعلى 30 صنف
             selected_month_top = st.selectbox("اختر الشهر لعرض أعلى 30 صنف:", ["الكل", "سبتمبر", "أكتوبر"])
             top_query_df = agg_df if selected_month_top == "الكل" else agg_df[agg_df["الشهر"] == selected_month_top]
             
@@ -146,7 +150,6 @@ if uploaded_file is not None:
                 hide_index=True
             )
 
-            # رسم بياني لأعلى الأصناف معجزة
             st.plotly_chart(
                 px.bar(
                     top_30_shortages.head(15),
@@ -158,13 +161,6 @@ if uploaded_file is not None:
                     template="plotly_dark"
                 ),
                 use_container_width=True
-            )
-
-            st.download_button(
-                "📥 تحميل تقرير أعلى 30 صنف معجز (CSV)",
-                top_30_shortages.to_csv(index=False).encode("utf-8-sig"),
-                file_name="top_30_shortage_items.csv",
-                mime="text/csv",
             )
 
         with tab2:
@@ -214,4 +210,4 @@ if uploaded_file is not None:
     except Exception as e:
         st.error(f"حدث خطأ أثناء معالجة البيانات: {e}")
 else:
-  st.info("👈 يرجى رفع ملف الإكسيل المجمع لعرض المؤشرات والتقارير الفورية.")    
+  st.info("👈 يرجى رفع ملف الإكسيل في مستودع جيت هاب أو رفعه يدوياً لعرض المؤشرات الفورية.")
