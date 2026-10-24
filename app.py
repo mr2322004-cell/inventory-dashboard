@@ -26,14 +26,13 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 st.title("📦 متابعة محمد قطان - تقارير الجرد والفروقات والتحليل المتقدم")
 st.caption("نظام التحليل المالي والمخزني المتقدم لشهر سبتمبر وأكتوبر + أداة دمج وتصدير الجرد اليومي")
 
-# إنشاء القائمة الرئيسية للتحكم
 main_mode = st.sidebar.radio(
     "اختر القسم المطلوبة:",
     ["📊 التقرير التنفيذي (شهر 9 وشهر 10)", "📂 دمج ملفات الجرد اليومي وتصدير الإكسيل"]
 )
 
 # ---------------------------------------------------------
-# القسم الأول: التقرير الرئيسي القديم (سبتمبر وأكتوبر)
+# القسم الأول: التقرير الرئيسي (سبتمبر وأكتوبر)
 # ---------------------------------------------------------
 if main_mode == "📊 التقرير التنفيذي (شهر 9 وشهر 10)":
     st.subheader("📊 لوحة تحكم ومؤشرات أداء الجرد (سبتمبر وأكتوبر)")
@@ -92,7 +91,6 @@ if main_mode == "📊 التقرير التنفيذي (شهر 9 وشهر 10)":
             df["الكمية الفعلية"] = pd.to_numeric(df["ActualQty"], errors="coerce").fillna(0)
             df["الفرق"] = pd.to_numeric(df["Difference"], errors="coerce").fillna(0)
 
-            # تجميع البيانات لمنع التكرار
             agg_df = df.groupby(["الشهر", "كود الصنف", "اسم الصنف"], as_index=False).agg({
                 "الكمية الدفترية": "sum",
                 "الكمية الفعلية": "sum",
@@ -138,7 +136,7 @@ if main_mode == "📊 التقرير التنفيذي (شهر 9 وشهر 10)":
             tab1, tab2, tab3 = st.tabs(["🔥 أعلى 30 صنف معجز", "📋 الملخص والمقارنة", "🔍 بحث وتصفية"])
 
             with tab1:
-                st.subheader("🔥 أعلى 30 صنف بها عجز ونقص (أكثر الأصناف استنزافاً)")
+                st.subheader("🔥 أعلى 30 صنف بها عجز ونقص")
                 top_30 = agg_df.sort_values("كمية العجز", ascending=False).head(30)
                 st.dataframe(top_30[["الشهر", "كود الصنف", "اسم الصنف", "الكمية الدفترية", "الكمية الفعلية", "كمية العجز"]], use_container_width=True, hide_index=True)
 
@@ -162,13 +160,13 @@ if main_mode == "📊 التقرير التنفيذي (شهر 9 وشهر 10)":
         st.info("👈 يرجى رفع ملف الإكسيل المجمع لعرض التقارير والمؤشرات.")
 
 # ---------------------------------------------------------
-# القسم الثاني: الأداة الجديدة لدمج تقارير الجرد اليومية والتصدير
+# القسم الثاني: دمج تقارير الجرد اليومي وتصدير الملفات
 # ---------------------------------------------------------
 else:
     st.subheader("📂 مركز دمج ملفات الجرد اليومي واستخراج التقارير")
-    st.caption("ارمي هنا كل تقارير الجرد اليومية (مثل ملفات الكاشيرات والمجموعات)، وسيتم تجميعهم وتوليد ملفات إكسيل للعجز والزيادة والرموز.")
+    st.caption("ارمي هنا كل تقارير الجرد اليومية، وسيتم تجميعهم وتوليد ملفات CSV نظيفة وسريعة للتحميل الفوري.")
 
-    daily_files = st.file_uploader("ارفع تقارير الجرد اليومية (يمكنك تحديد ملفات متعددة CSV/Excel):", type=["csv", "xlsx", "xls"], accept_multiple_files=True)
+    daily_files = st.file_uploader("ارفع تقارير الجرد اليومية (حدد ملفات متعددة CSV/Excel):", type=["csv", "xlsx", "xls"], accept_multiple_files=True)
 
     if daily_files:
         dfs = []
@@ -196,7 +194,6 @@ else:
             m_df["الكمية الفعلية"] = pd.to_numeric(m_df[c_act], errors="coerce").fillna(0)
             m_df["الفرق"] = pd.to_numeric(m_df[c_diff], errors="coerce").fillna(0)
 
-            # تجميع الأصناف المتشابهة لمنع التكرار
             daily_agg = m_df.groupby(["رمز المادة", "اسم الصنف"], as_index=False).agg({
                 "الكمية الدفترية": "sum",
                 "الكمية الفعلية": "sum",
@@ -206,37 +203,32 @@ else:
             daily_agg["كمية العجز"] = daily_agg["الفرق"].apply(lambda x: x if x > 0 else 0)
             daily_agg["كمية الزيادة"] = daily_agg["الفرق"].apply(lambda x: -x if x < 0 else 0)
 
-            shortage_excel = daily_agg[daily_agg["كمية العجز"] > 0][["رمز المادة", "اسم الصنف", "الكمية الدفترية", "الكمية الفعلية", "كمية العجز"]].sort_values("كمية العجز", ascending=False)
-            surplus_excel = daily_agg[daily_agg["كمية الزيادة"] > 0][["رمز المادة", "اسم الصنف", "الكمية الدفترية", "الكمية الفعلية", "كمية الزيادة"]].sort_values("كمية الزيادة", ascending=False)
-            reference_excel = daily_agg[["رمز المادة", "اسم الصنف"]].drop_duplicates()
+            shortage_df = daily_agg[daily_agg["كمية العجز"] > 0][["رمز المادة", "اسم الصنف", "الكمية الدفترية", "الكمية الفعلية", "كمية العجز"]].sort_values("كمية العجز", ascending=False)
+            surplus_df = daily_agg[daily_agg["كمية الزيادة"] > 0][["رمز المادة", "اسم الصنف", "الكمية الدفترية", "الكمية الفعلية", "كمية الزيادة"]].sort_values("كمية الزيادة", ascending=False)
+            reference_df = daily_agg[["رمز المادة", "اسم الصنف"]].drop_duplicates()
 
             st.success(f"تم دمج {len(daily_files)} ملف بنجاح وتجميع الأصناف المتشابهة!")
 
-            d_tab1, d_tab2, d_tab3 = st.tabs(["🔥 شيت العجز (Excel)", "➕ شيت الزيادة (Excel)", "📚 مرجع الرموز"])
+            d_tab1, d_tab2, d_tab3 = st.tabs(["🔥 شيت العجز", "➕ شيت الزيادة", "📚 مرجع الرموز"])
 
+### [Citation: 2]
             with d_tab1:
                 st.subheader("الأصناف التي بها عجز (نقص)")
-                st.dataframe(shortage_excel, use_container_width=True, hide_index=True)
+                st.dataframe(shortage_df, use_container_width=True, hide_index=True)
                 
-                out1 = io.BytesIO()
-                with pd.ExcelWriter(out1, engine='xlsxwriter') as writer:
-                    shortage_excel.to_excel(writer, sheet_name='العجز', index=False)
-                st.download_button("📥 تحميل شيت العجز (Excel)", out1.getvalue(), "تقارير_العجز_اليومي.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                csv_shortage = shortage_df.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 تحميل ملف العجز (CSV جاهز للإكسيل)", csv_shortage, "تقارير_العجز_اليومي.csv", "text/csv")
 
             with d_tab2:
                 st.subheader("الأصناف التي بها زيادة (فائض)")
-                st.dataframe(surplus_excel, use_container_width=True, hide_index=True)
+                st.dataframe(surplus_df, use_container_width=True, hide_index=True)
                 
-                out2 = io.BytesIO()
-                with pd.ExcelWriter(out2, engine='xlsxwriter') as writer:
-                    surplus_excel.to_excel(writer, sheet_name='الزيادة', index=False)
-                st.download_button("📥 تحميل شيت الزيادة (Excel)", out2.getvalue(), "تقارير_الزيادة_اليومية.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                csv_surplus = surplus_df.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 تحميل ملف الزيادة (CSV جاهز للإكسيل)", csv_surplus, "تقارير_الزيادة_اليومية.csv", "text/csv")
 
             with d_tab3:
                 st.subheader("مرجع رموز المواد والأسماء")
-                st.dataframe(reference_excel, use_container_width=True, hide_index=True)
+                st.dataframe(reference_df, use_container_width=True, hide_index=True)
                 
-                out3 = io.BytesIO()
-                with pd.ExcelWriter(out3, engine='xlsxwriter') as writer:
-                    reference_excel.to_excel(writer, sheet_name='مرجع_الرموز', index=False)
-                st.download_button("📥 تحميل شيت المرجع (Excel)", out3.getvalue(), "مرجع_الرموز_والاسماء.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                csv_ref = reference_df.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 تحميل ملف المرجع (CSV جاهز للإكسيل)", csv_ref, "مرجع_الرموز_والاسماء.csv", "text/csv")
