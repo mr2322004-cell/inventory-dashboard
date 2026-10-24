@@ -25,7 +25,7 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - تقارير الجرد والفروقات والتحليل المتقدم")
-st.caption("تقارير دقيقة ومفصلة لشهر سبتمبر وأكتوبر بدون تكرار للأصناف")
+st.caption("تقارير دقيقة ومفصلة لشهر سبتمبر وأكتوبر (الموجب عجز / السالب زيادة)")
 
 uploaded_file = st.file_uploader("📁 ارفع ملف الإكسيل المجمع هنا", type=["xlsx", "xls", "csv"])
 
@@ -67,11 +67,9 @@ if uploaded_file is not None:
             df.loc[full_text.str.contains("10|oct|أكتوبر|اكتوبر", na=False), "الشهر"] = "أكتوبر"
             df.loc[full_text.str.contains("9|sep|سبتمبر", na=False), "الشهر"] = "سبتمبر"
 
-        # تنظيف وتوحيد أعمدة الكميات
         if "Difference" not in df.columns and "SystemQty" in df.columns and "ActualQty" in df.columns:
             df["Difference"] = df["SystemQty"] - df["ActualQty"]
 
-        # تجهيز الأكواد والأسماء
         code_col = "Code" if "Code" in df.columns else df.columns[1]
         name_col = "Detail" if "Detail" in df.columns else df.columns[3]
 
@@ -81,18 +79,17 @@ if uploaded_file is not None:
         df["الكمية الفعلية"] = pd.to_numeric(df["ActualQty"], errors="coerce").fillna(0)
         df["الفرق"] = pd.to_numeric(df["Difference"], errors="coerce").fillna(0)
 
-        # تجميع البيانات لمنع تكرار الأصناف لكل شهر نهائياً
+        # تجميع البيانات لمنع التكرار لكل شهر
         agg_df = df.groupby(["الشهر", "كود الصنف", "اسم الصنف"], as_index=False).agg({
             "الكمية الدفترية": "sum",
             "الكمية الفعلية": "sum",
             "الفرق": "sum"
         })
 
-        # حساب العجز والزيادة (حسب منطق المخازن: الدفترية أكبر من الفعلية = عجز)
+        # حسب طلبك: الموجب عجز (نقص) والسالب زيادة
         agg_df["كمية العجز"] = agg_df["الفرق"].apply(lambda x: x if x > 0 else 0)
         agg_df["كمية الزيادة"] = agg_df["الفرق"].apply(lambda x: -x if x < 0 else 0)
 
-        # حساب مؤشرات سبتمبر وأكتوبر
         def get_month_metrics(m_name):
             m_data = agg_df[agg_df["الشهر"] == m_name]
             total_codes = m_data["كود الصنف"].nunique()
@@ -118,7 +115,6 @@ if uploaded_file is not None:
         m9 = get_month_metrics("سبتمبر")
         m10 = get_month_metrics("أكتوبر")
 
-        # عرض المؤشرات العليا الرئيسية
         st.divider()
         st.subheader("📊 مؤشرات الأداء ونسب الفقد والجرد لشهر 9 وشهر 10")
 
@@ -128,18 +124,51 @@ if uploaded_file is not None:
         col3.metric("⚠️ جرد غير مضبوط — سبتمبر", f"{m9['mismatch_rate']:.2f}%", f"{m9['mismatch_codes']:,} صنف")
         col4.metric("⚠️ جرد غير مضبوط — أكتوبر", f"{m10['mismatch_rate']:.2f}%", f"{m10['mismatch_codes']:,} صنف")
 
-        st.caption("ملاحظة: نسبة الفقد = إجمالي كمية العجز ÷ إجمالي الكمية الدفترية × 100. نسبة الجرد غير المضبوط = عدد الأصناف التي بها فروقات ÷ إجمالي الأصناف × 100.")
-
-        # التبويبات التفصيلية
         tab1, tab2, tab3, tab4 = st.tabs([
+            "🔥 أعلى 30 صنف معجز (عجز)",
             "📋 الملخص والمقارنة",
-            "📉 الأصناف الفاقدة (عجز)",
             "➕ الأصناف الزائدة",
             "🔍 بحث وفلترة متقدمة",
         ])
 
         with tab1:
-            st.subheader("مقارنة شاملة بين شهر سبتمبر وأكتوبر (بدون تكرار)")
+            st.subheader("🔥 أعلى 30 صنف بها عجز ونقص (أكثر الأصناف استنزافاً)")
+            
+            # اختيار الشهر أو عرض الكل لأعلى 30 صنف
+            selected_month_top = st.selectbox("اختر الشهر لعرض أعلى 30 صنف:", ["الكل", "سبتمبر", "أكتوبر"])
+            top_query_df = agg_df if selected_month_top == "الكل" else agg_df[agg_df["الشهر"] == selected_month_top]
+            
+            top_30_shortages = top_query_df.sort_values("كمية العجز", ascending=False).head(30)
+            
+            st.dataframe(
+                top_30_shortages[["الشهر", "كود الصنف", "اسم الصنف", "الكمية الدفترية", "الكمية الفعلية", "الفرق", "كمية العجز"]],
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # رسم بياني لأعلى الأصناف معجزة
+            st.plotly_chart(
+                px.bar(
+                    top_30_shortages.head(15),
+                    x="كمية العجز",
+                    y="اسم الصنف",
+                    color="الشهر",
+                    orientation="h",
+                    title="أكثر الأصناف التي بها عجز بالمخزن",
+                    template="plotly_dark"
+                ),
+                use_container_width=True
+            )
+
+            st.download_button(
+                "📥 تحميل تقرير أعلى 30 صنف معجز (CSV)",
+                top_30_shortages.to_csv(index=False).encode("utf-8-sig"),
+                file_name="top_30_shortage_items.csv",
+                mime="text/csv",
+            )
+
+        with tab2:
+            st.subheader("مقارنة شاملة بين شهر سبتمبر وأكتوبر")
             summary_table = pd.DataFrame([
                 {
                     "الشهر": "سبتمبر",
@@ -164,42 +193,10 @@ if uploaded_file is not None:
             ])
             st.dataframe(summary_table, use_container_width=True)
 
-            # رسم بياني مقارنة كميات العجز والزيادة
-            st.plotly_chart(
-                px.bar(
-                    summary_table,
-                    x="الشهر",
-                    y=["إجمالي العجز", "إجمالي الزيادة"],
-                    barmode="group",
-                    title="مقارنة إجماليات العجز والزيادة بين الشهرين",
-                    template="plotly_dark"
-                ),
-                use_container_width=True
-            )
-
-        with tab2:
-            st.subheader("📉 الأصناف الفاقدة (التي بها عجز ونقص)")
-            shortages_all = agg_df[agg_df["كمية العجز"] > 0].sort_values("كمية العجز", ascending=False)
-            st.dataframe(shortages_all[["الشهر", "كود الصنف", "اسم الصنف", "الكمية الدفترية", "الكمية الفعلية", "الفرق", "كمية العجز"]], use_container_width=True, hide_index=True)
-            
-            st.download_button(
-                "📥 تحميل تقرير الأصناف الفاقدة (CSV)",
-                shortages_all.to_csv(index=False).encode("utf-8-sig"),
-                file_name="shortage_items_report.csv",
-                mime="text/csv",
-            )
-
         with tab3:
-            st.subheader("➕ الأصناف التي بها زيادة في المخزون")
+            st.subheader("➕ الأصناف التي بها زيادة في المخزون (السالب)")
             surpluses_all = agg_df[agg_df["كمية الزيادة"] > 0].sort_values("كمية الزيادة", ascending=False)
             st.dataframe(surpluses_all[["الشهر", "كود الصنف", "اسم الصنف", "الكمية الدفترية", "الكمية الفعلية", "الفرق", "كمية الزيادة"]], use_container_width=True, hide_index=True)
-            
-            st.download_button(
-                "📥 تحميل تقرير الأصناف الزائدة (CSV)",
-                surpluses_all.to_csv(index=False).encode("utf-8-sig"),
-                file_name="surplus_items_report.csv",
-                mime="text/csv",
-            )
 
         with tab4:
             st.subheader("🔍 بحث وفلترة متقدمة للأصناف بدون تكرار")
@@ -217,4 +214,4 @@ if uploaded_file is not None:
     except Exception as e:
         st.error(f"حدث خطأ أثناء معالجة البيانات: {e}")
 else:
-  st.info("👈 يرجى رفع ملف الإكسيل المجمع لعرض المؤشرات والتقارير الفورية.")
+  st.info("👈 يرجى رفع ملف الإكسيل المجمع لعرض المؤشرات والتقارير الفورية.")    
