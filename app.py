@@ -1,21 +1,18 @@
 import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as stt_sns
 import streamlit as st
 
 # إعداد الصفحة لتكون واسعة وبتنسيق احترافي
 st.set_page_config(
-    page_title="لوحة تحكم تقارير الجرد والفروقات الاحترافية",
-    page_icon="🚀",
-    layout="wide",
+    page_title="لوحة تحكم تقارير الجرد المفصلة", page_icon="🚀", layout="wide"
 )
 
 # تصميم العنوان بشكل فخم
 st.markdown(
     """
     <div style='background-color: #1E1E2F; padding: 20px; border-radius: 10px; text-align: center;'>
-        <h1 style='color: #00FFA3; margin: 0;'>🚀 لوحة تحكم تقارير الجرد والفروقات الاحترافية</h1>
-        <p style='color: #FFFFFF; margin-top: 10px;'>تحليل شامل ودقيق للفروقات والأصناف (شهر 9 وشهر 10)</p>
+        <h1 style='color: #00FFA3; margin: 0;'>🚀 لوحة تحكم تقارير الجرد والفروقات (التحليل المفصل)</h1>
+        <p style='color: #FFFFFF; margin-top: 10px;'>تحليل شامل ودقيق لأرصدة شهر 9 وشهر 10</p>
     </div>
 """,
     unsafe_allow_html=True,
@@ -25,96 +22,95 @@ st.write("")
 
 # رفع الملف
 uploaded_file = st.file_uploader(
-    "📁 ارفع ملف الإكسيل المجمع هنا لاستعراض التحليل الواو",
-    type=["xlsx", "xls", "csv"],
+    "📁 ارفع ملف الإكسيل المجمع هنا", type=["xlsx", "xls", "csv"]
 )
 
 if uploaded_file is not None:
   try:
-    # قراءة الملف بذكاء
     if uploaded_file.name.endswith(".csv"):
       df = pd.read_csv(uploaded_file)
     else:
       excel_file = pd.ExcelFile(uploaded_file)
-      sheet_name = excel_file.sheet_names[0]
-      df = pd.read_excel(excel_file, sheet_name=sheet_name)
+      df = pd.read_excel(excel_file, sheet_name=excel_file.sheet_names[0])
 
-    # معالجة عمود التاريخ وتوحيد اسم عمود الفرق إن وجد
+    # معالجة التاريخ إن وجد
     for col in df.columns:
       if "date" in str(col).lower() or "تاريخ" in str(col):
         df["Date"] = pd.to_datetime(df[col], errors="coerce")
         break
 
-    # التأكد من الأعمدة الأساسية
     if "Difference" in df.columns:
-      # حساب الإحصائيات الكبرى
       total_items = len(df)
       total_diff = df["Difference"].sum()
-      shortage_items = df[df["Difference"] < 0]
-      excess_items = df[df["Difference"] > 0]
+      shortage_df = df[df["Difference"] < 0]
+      excess_df = df[df["Difference"] > 0]
+      exact_df = df[df["Difference"] == 0]
 
-      # عرض مربعات إحصائية فخمة (Metrics)
+      # مربعات إحصائية فخمة
       st.markdown("---")
       col1, col2, col3, col4 = st.columns(4)
       col1.metric("📦 إجمالي الأصناف", f"{total_items:,}")
-      col2.metric(
-          "📉 إجمالي الفروقات",
-          f"{total_diff:,.2f}",
-          delta_color="inverse",
-      )
-      col3.metric("⚠️ أصناف بها عجز", f"{len(shortage_items):,}")
-      col4.metric("➕ أصناف بها زيادة", f"{len(excess_items):,}")
+      col2.metric("📉 إجمالي الفروقات", f"{total_diff:,.2f}")
+      col3.metric("⚠️ أصناف بها عجز", f"{len(shortage_df):,}")
+      col4.metric("➕ أصناف بها زيادة", f"{len(excess_df):,}")
       st.markdown("---")
 
-      # قسم الرسوم البيانية الاحترافية
-      st.subheader("📊 الرسوم البيانية والتحليلات البصرية")
-      fig, ax = plt.subplots(figsize=(10, 4))
-      top_diffs = df.nlargest(10, "Difference") if "Detail" in df.columns else df
-      if "Detail" in df.columns:
-        ax.bar(
-            top_diffs["Detail"].astype(str),
-            top_diffs["Difference"],
-            color="#00FFA3",
+      # تبويبات مفصلة بالكامل
+      tab1, tab2, tab3, tab4 = st.tabs([
+          "📋 كل البيانات",
+          "📉 تفاصيل العجز (الواضح)",
+          "➕ تفاصيل الزيادة",
+          "🔍 بحث وفلترة متقدمة",
+      ])
+
+      with tab1:
+        st.subheader("عرض شامل لكافة سجلات الجرد")
+        st.dataframe(df, use_container_width=True)
+
+      with tab2:
+        st.subheader("⚠️ الأصناف التي بها عجز (نقص في المخزون)")
+        st.metric("عدد أصناف العجز", len(shortage_df))
+        st.dataframe(shortage_df, use_container_width=True)
+        # زر تحميل العجز
+        st.download_button(
+            "📥 تحميل تقرير العجز فقط (CSV)",
+            shortage_df.to_csv(index=False).encode("utf-8"),
+            file_name="shortage_report.csv",
+            mime="text/csv",
         )
-        plt.xticks(rotation=45, ha="right")
-        ax.set_title("أكبر الفروقات المسجلة للأصناف", color="white")
-        fig.patch.set_facecolor("#0E1117")
-        ax.set_facecolor("#1E1E2F")
-        ax.tick_params(colors="white")
-        st.pyplot(fig)
 
-      # جدول البيانات مع خيارات البحث والفلترة
-      st.subheader("📋 جدول البيانات التفصيلي والفلاتر")
-      search_term = st.text_input(
-          "🔍 ابحث عن صنف أو كود معين:", ""
-      )
-      if search_term:
-        df_filtered = df[
-            df.astype(str)
-            .apply(lambda row: row.str.contains(search_term, case=False).any(), axis=1)
-        ]
-      else:
-        df_filtered = df
+      with tab3:
+        st.subheader("➕ الأصناف التي بها زيادة في المخزون")
+        st.metric("عدد أصناف الزيادة", len(excess_df))
+        st.dataframe(excess_df, use_container_width=True)
+        # زر تحميل الزيادة
+        st.download_button(
+            "📥 تحميل تقرير الزيادة فقط (CSV)",
+            excess_df.to_csv(index=False).encode("utf-8"),
+            file_name="excess_report.csv",
+            mime="text/csv",
+        )
 
-      st.dataframe(df_filtered, use_container_width=True)
-
-      # زر تحميل النتائج المفدلة
-      csv_data = df_filtered.to_csv(index=False).encode("utf-8")
-      st.download_button(
-          label="📥 تحميل النتائج المفلترة كملف CSV",
-          data=csv_data,
-          file_name="filtered_inventory_report.csv",
-          mime="text/csv",
-      )
+      with tab4:
+        st.subheader("🔍 البحث المخصص حسب الصنف أو الكود")
+        search_query = st.text_input("أدخل اسم الصنف أو الباركود أو الكود:")
+        if search_query:
+          filtered_search = df[
+              df.astype(str)
+              .apply(
+                  lambda r: r.str.contains(search_query, case=False).any(),
+                  axis=1,
+              )
+          ]
+          st.write(f"نتائج البحث المطابقة: {len(filtered_search)} صنف")
+          st.dataframe(filtered_search, use_container_width=True)
+        else:
+          st.info("اكتب أي كلمة للبحث الفوري في كافة الأعمدة.")
 
     else:
-      st.success("تم رفع الملف بنجاح ولكن يرجى التأكد من تطابق اسم عمود الفروقات.")
-      st.dataframe(df.head(10))
+      st.error("عمود 'Difference' غير موجود في الملف، تأكد من مطابقة أسماء الأعمدة.")
 
   except Exception as e:
-    st.error(f"حدث خطأ أثناء معالجة الملف: {e}")
+    st.error(fحدث خطأ أثناء المعالجة: {e})
 else:
-  st.info(
-      "👈 يرجى رفع ملف الإكسيل المجمع من الزر بالأعلى لنبدأ عرض لوحة التحكم"
-      " الاحترافية."
-  )
+  st.info("👈 يرجى رفع ملف الإكسيل المجمع لعرض التحليل المفصل بالكامل.")
