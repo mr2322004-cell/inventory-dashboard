@@ -24,7 +24,7 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المتكامل: تقارير الشهور + دمج اليومي + التقرير المستقل + جرد الموبايل بالباركود")
+st.caption("النظام المتكامل: تقارير الشهور + دمج اليومي + التقرير المستقل + جرد الباركود والموبايل")
 
 main_mode = st.sidebar.radio(
     "📂 اختر القسم المطلوب:",
@@ -32,7 +32,7 @@ main_mode = st.sidebar.radio(
         "📊 التقرير التنفيذي (شهر 9 وشهر 10)", 
         "📂 دمج ملفات الجرد اليومي وتصدير الإكسيل", 
         "🔍 تقرير الفروقات المستقل (شامل وفوري)",
-        "📱 جرد الموبايل بالباركود والبحث الذكي"
+        "📱 جرد الباركود والموبايل (سريع وفوري)"
     ]
 )
 
@@ -165,7 +165,7 @@ if main_mode == "📊 التقرير التنفيذي (شهر 9 وشهر 10)":
         st.info("👈 يرجى رفع ملف الإكسيل المجمع لعرض التقارير والمؤشرات.")
 
 # ---------------------------------------------------------
-# القسم الثاني: دمج تقارير الجرد اليومي وتصدير الملفات
+# القسم الثاني: دمج تقارير الجرد اليومي وتصدير الإكسيل
 # ---------------------------------------------------------
 elif main_mode == "📂 دمج ملفات الجرد اليومي وتصدير الإكسيل":
     st.subheader("📂 مركز دمج ملفات الجرد اليومي واستخراج التقارير")
@@ -317,13 +317,13 @@ elif main_mode == "🔍 تقرير الفروقات المستقل (شامل و�
         st.info("👈 يرجى رفع ملفات الجرد في هذا القسم لعرض التقرير المستقل وتحليل الفاقد والزيادة فوراً.")
 
 # ---------------------------------------------------------
-# القسم الرابع: جرد الموبايل بالباركود والبحث الذكي وتتبع الغير مجرود (متوافق مع ملفك الجديد)
+# القسم الرابع: جرد الباركود والموبايل (بحث بالباركود، الكمية النظامية، والغير مجرودة)
 # ---------------------------------------------------------
 else:
-    st.subheader("📱 قسم جرد الموبايل بالباركود والبحث الذكي")
-    st.caption("ارفع ملف الأصناف الأساسي (مثل ملف جرد المخزن)، وابحث بأي جزء من الاسم أو الكود، وأدخل الكمية الفعلية لجرد المخزن عبر الموبايل بكل سهولة.")
+    st.subheader("📱 جرد الباركود والموبايل (سريع وفوري)")
+    st.caption("ارفع ملف المخزن الأساسي، وامسح أو اكتب الباركود/اسم الصنف لتظهر الكمية النظامية وتدخل الفعلية فوراً، مع متابعة الأصناف غير المجرودة.")
 
-    base_file = st.file_uploader("📁 ارفع ملف الأصناف الأساسي (شيت يحتوي على: المادة، الكمية الحالية، إلخ):", type=["xlsx", "xls", "csv"])
+    base_file = st.file_uploader("📁 ارفع ملف المخزن الأساسي (يحتوي على: المادة، الكمية الحالية، إلخ):", type=["xlsx", "xls", "csv"])
 
     if base_file is not None:
         try:
@@ -332,77 +332,81 @@ else:
             else:
                 base_df = pd.read_excel(base_file)
 
-            # مطابقة أعمدة ملفك الجديد بدقة (المادة والكمية الحالية)
             c_material = "المادة" if "المادة" in base_df.columns else base_df.columns[1]
             c_qty = "الكمية الحالية" if "الكمية الحالية" in base_df.columns else base_df.columns[2]
 
             base_df["الصنف والمادة"] = base_df[c_material].astype(str).str.strip()
-            base_df["الكمية الدفترية"] = pd.to_numeric(base_df[c_qty], errors="coerce").fillna(0)
+            base_df["الكمية النظامية"] = pd.to_numeric(base_df[c_qty], errors="coerce").fillna(0)
 
-            if 'mobile_inventory_v2' not in st.session_state:
-                st.session_state['mobile_inventory_v2'] = {
-                    row["الصنف والمادة"]: {"دفطري": row["الكمية الدفترية"], "فعلي": None}
+            if 'mobile_inventory_v3' not in st.session_state:
+                st.session_state['mobile_inventory_v3'] = {
+                    row["الصنف والمادة"]: {"نظامي": row["الكمية النظامية"], "فعلي": None}
                     for _, row in base_df.iterrows()
                 }
 
-            st.success("تم تحميل ملف المخزن الأساسي بنجاح وجاهز للجرد والتفتيش بالموبايل!")
+            st.success("تم تحميل شيت المخزن بنجاح وجاهز للجرد عبر الموبايل!")
 
-            scan_tab1, scan_tab2, scan_tab3 = st.tabs(["📷 البحث الذكي وجرد الأصناف", "⚠️ الأصناف غير المجرودة", "📥 تصدير تقرير الجرد النهائي"])
+            scan_tab1, scan_tab2, scan_tab3 = st.tabs(["📷 ماسح الباركود والبحث الفوري", "⚠️ الأصناف غير المجرودة (مع كمياتها)", "📥 تصدير تقرير الجرد النهائي"])
 
             with scan_tab1:
-                st.subheader("🔍 البحث الذكي (بالكود أو اسم الصنف)")
-                search_term = st.text_input("اكتب جزء من اسم الصنف أو الكود (بحث تقريبي سريع):")
+                st.subheader("🔍 مسح الباركود أو البحث السريع")
+                
+                # استخدام حقل إدخال يدعم الباركود عند استخدام ماسح الكاميرا الخارجي أو اللاسلكي
+                scan_input = st.text_input("مسح الباركود بالكاميرا أو كتابة اسم/كود الصنف للبحث الفوري:", placeholder="امسح الباركود أو اكتب هنا...")
 
                 target_items = base_df.copy()
-                if search_term:
+                if scan_input:
                     target_items = target_items[
-                        target_items["الصنف والمادة"].str.contains(search_term, case=False, na=False)
+                        target_items["الصنف والمادة"].str.contains(scan_input, case=False, na=False)
                     ]
 
                 if not target_items.empty:
-                    st.write(f"تم العثور على {len(target_items)} صنف مطابق:")
-                    for idx, row in target_items.head(15).iterrows():
+                    st.write(f"الأصناف المطابقة (إجمالي: {len(target_items)} صنف):")
+                    for idx, row in target_items.head(10).iterrows():
                         item_name = row["الصنف والمادة"]
-                        sys_q = row["الكمية الدفترية"]
-                        current_actual = st.session_state['mobile_inventory_v2'][item_name]["فعلي"]
+                        sys_q = row["الكمية النظامية"]
+                        current_actual = st.session_state['mobile_inventory_v3'][item_name]["فعلي"]
 
-                        col_x, col_y, col_z = st.columns([3, 1, 1])
-                        col_x.markdown(f"**{item_name}**\n*(الكمية الدفترية: {sys_q})*")
-                        
-                        new_actual = col_y.number_input(
-                            "الفعلي", 
+                        st.markdown(f"---")
+                        st.markdown(f"📦 **{item_name}**")
+                        st.markdown(f"📌 **الكمية النظامية (الدفترية):** `{sys_q:,.2f}`")
+
+                        col_in, col_btn = st.columns([3, 1])
+                        new_actual = col_in.number_input(
+                            "أدخل الكمية الفعلية:", 
                             min_value=0.0, 
                             value=float(current_actual) if current_actual is not None else float(sys_q), 
-                            key=f"mob_act_{idx}"
+                            key=f"act_v3_{idx}"
                         )
                         
-                        if col_z.button("حفظ الجرد", key=f"mob_btn_{idx}"):
-                            st.session_state['mobile_inventory_v2'][item_name]["فعلي"] = new_actual
-                            st.success(f"تم حفظ جرد الصنف بنجاح!")
+                        if col_btn.button("حفظ الفعلي ✓", key=f"btn_v3_{idx}"):
+                            st.session_state['mobile_inventory_v3'][item_name]["فعلي"] = new_actual
+                            st.success(f"تم حفظ الكمية الفعلية بنجاح!")
                 else:
-                    st.warning("لم يتم العثور على أصناف مطابقة لكلمات البحث.")
+                    st.warning("لم يتم العثور على صنف مطابق. تأكد من الباركود أو الكود المدخل.")
 
             with scan_tab2:
-                st.subheader("⚠️ الأصناف التي لم يتم جردها بعد")
+                st.subheader("⚠️ الأصناف التي لم يتم جردها بعد (مع كمياتها النظامية)")
                 ungraced_list = [
-                    {"الصنف والمادة": k, "الكمية الدفترية": v["دفطري"]}
-                    for k, v in st.session_state['mobile_inventory_v2'].items() if v["فعلي"] is None
+                    {"الصنف والمادة": k, "الكمية النظامية": v["نظامي"]}
+                    for k, v in st.session_state['mobile_inventory_v3'].items() if v["فعلي"] is None
                 ]
                 df_ungraced = pd.DataFrame(ungraced_list)
                 st.info(f"إجمالي الأصناف المتبقية ولم تُجرَد بعد: {len(df_ungraced)} صنف")
+                
                 if not df_ungraced.empty:
                     st.dataframe(df_ungraced, use_container_width=True, hide_index=True)
 
             with scan_tab3:
                 st.subheader("📥 تقرير نتائج الجرد النهائي وتصدير الإكسيل")
                 graced_list = []
-                for k, v in st.session_state['mobile_inventory_v2'].items():
+                for k, v in st.session_state['mobile_inventory_v3'].items():
                     if v["فعلي"] is not None:
-                        diff = v["دفطري"] - v["فعلي"]
+                        diff = v["نظامي"] - v["فعلي"]  # موجب عجز، سالب زيادة
                         status = "عجز (نقص)" if diff > 0 else ("زيادة (فائض)" if diff < 0 else "مطابق تماماً")
                         graced_list.append({
                             "الصنف والمادة": k,
-                            "الكمية الدفترية": v["دفطري"],
+                            "الكمية النظامية": v["نظامي"],
                             "الكمية الفعلية": v["فعلي"],
                             "الفرق": diff,
                             "حالة الصنف": status
@@ -420,9 +424,9 @@ else:
                         "text/csv"
                     )
                 else:
-                    st.warning("لم يتم جرد أي صنف حتى الان لطباعة أو تصدير التقرير.")
+                    st.warning("لم يتم جرد أي صنف حتى الآن لطباعة أو تصدير التقرير النهائي.")
 
         except Exception as e:
-            st.error(f"حدث خطأ أثناء معالجة ملف الأصناف الأساسي: {e}")
+            st.error(f"حدث خطأ أثناء معالجة ملف المخزن: {e}")
     else:
-        st.info("👈 يرجى رفع ملف المخزن الأساسي في هذا القسم لبدء الجرد الذكي عبر الموبايل.")
+        st.info("👈 يرجى رفع ملف المخزن الأساسي في هذا القسم لبدء الجرد السريع عبر الموبايل.")
