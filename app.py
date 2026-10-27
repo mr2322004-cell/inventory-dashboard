@@ -317,7 +317,7 @@ elif main_mode == "🔍 تقرير الفروقات المستقل (شامل و�
         st.info("👈 يرجى رفع ملفات الجرد في هذا القسم لعرض التقرير المستقل وتحليل الفاقد والزيادة فوراً.")
 
 # ---------------------------------------------------------
-# القسم الرابع: الجرد السريع والبحث الذكي بالموبايل (بدون أخطاء أو قيود)
+# القسم الرابع: الجرد السريع والبحث الذكي بالموبايل (قراءة الكمية الحالية بدقة تامة)
 # ---------------------------------------------------------
 else:
     st.subheader("📱 الجرد السريع والبحث الذكي بالموبايل")
@@ -332,19 +332,21 @@ else:
             else:
                 base_df = pd.read_excel(base_file)
 
+            # التقاط عمود "المادة" وعمود "الكمية الحالية" بدقة قاطعة
             c_material = "المادة" if "المادة" in base_df.columns else base_df.columns[1]
-            c_qty = "الكمية الحالية" if "الكمية الحالية" in base_df.columns else base_df.columns[2]
-
+            c_qty = None
             for col in base_df.columns:
-                if "الكمية الحالية" in str(col):
+                if "الكمية الحالية" in str(col).strip():
                     c_qty = col
                     break
+            if not c_qty:
+                c_qty = base_df.columns[2] # الافتراضي
 
             base_df["الصنف والمادة"] = base_df[c_material].astype(str).str.strip()
             base_df["الكمية النظامية"] = pd.to_numeric(base_df[c_qty], errors="coerce").fillna(0)
 
-            if 'mobile_inventory_v8' not in st.session_state:
-                st.session_state['mobile_inventory_v8'] = {
+            if 'mobile_inventory_v10' not in st.session_state:
+                st.session_state['mobile_inventory_v10'] = {
                     row["الصنف والمادة"]: {"نظامي": row["الكمية النظامية"], "فعلي": row["الكمية النظامية"]}
                     for _, row in base_df.iterrows()
                 }
@@ -368,7 +370,11 @@ else:
                 for idx, row in display_df.head(30).iterrows():
                     item_name = row["الصنف والمادة"]
                     sys_q = row["الكمية النظامية"]
-                    current_actual = st.session_state['mobile_inventory_v8'][item_name]["فعلي"]
+                    
+                    if item_name not in st.session_state['mobile_inventory_v10']:
+                        st.session_state['mobile_inventory_v10'][item_name] = {"نظامي": sys_q, "فعلي": sys_q}
+
+                    current_actual = st.session_state['mobile_inventory_v10'][item_name]["فعلي"]
 
                     col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
                     col1.markdown(f"**{item_name}**")
@@ -377,11 +383,11 @@ else:
                     new_act = col3.number_input(
                         "الفعلي", 
                         value=float(current_actual), 
-                        key=f"act_direct_v8_{idx}",
+                        key=f"act_direct_v10_{idx}",
                         label_visibility="collapsed"
                     )
                     
-                    st.session_state['mobile_inventory_v8'][item_name]["فعلي"] = new_act
+                    st.session_state['mobile_inventory_v10'][item_name]["فعلي"] = new_act
                     
                     diff = new_act - sys_q
                     
@@ -397,7 +403,7 @@ else:
                 st.subheader("⚠️ الأصناف التي لم يتم تعديلها أو جردها بعد (مطابقة للنظام)")
                 ungraced_list = [
                     {"الصنف والمادة": k, "الكمية النظامية": v["نظامي"], "الكمية الفعلية": v["فعلي"]}
-                    for k, v in st.session_state['mobile_inventory_v8'].items() if v["نظامي"] == v["فعلي"]
+                    for k, v in st.session_state['mobile_inventory_v10'].items() if v["نظامي"] == v["فعلي"]
                 ]
                 df_ungraced = pd.DataFrame(ungraced_list)
                 st.info(f"إجمالي الأصناف التي بنفس الكمية النظامية: {len(df_ungraced)} صنف")
@@ -407,7 +413,7 @@ else:
             with scan_tab3:
                 st.subheader("📥 تقرير نتائج الجرد النهائي وتصدير الإكسيل")
                 final_list = []
-                for k, v in st.session_state['mobile_inventory_v8'].items():
+                for k, v in st.session_state['mobile_inventory_v10'].items():
                     diff = v["فعلي"] - v["نظامي"]
                     if diff < 0:
                         status = "عجز (نقص)"
@@ -439,3 +445,4 @@ else:
             st.error(f"حدث خطأ أثناء معالجة ملف المخزن: {e}")
     else:
         st.info("👈 يرجى رفع ملف المخزن الأساسي في هذا القسم لبدء الجرد السريع عبر الموبايل.")
+            
