@@ -23,12 +23,18 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📦 متابعة محمد قطان - تقارير الجرد والفروقات والتحليل المتقدم")
-st.caption("نظام التحليل المالي والمخزني المتقدم لشهر سبتمبر وأكتوبر + أداة دمج وتصدير الجرد اليومي")
+st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
+st.caption("النظام المتكامل: تقارير الشهور + دمج اليومي + التقرير المستقل + جرد الموبايل بالباركود")
 
+# القائمة الجانبية للأقسام الأربعة
 main_mode = st.sidebar.radio(
-    "اختر القسم المطلوبة:",
-    ["📊 التقرير التنفيذي (شهر 9 وشهر 10)", "📂 دمج ملفات الجرد اليومي وتصدير الإكسيل"]
+    "📂 اختر القسم المطلوب:",
+    [
+        "📊 التقرير التنفيذي (شهر 9 وشهر 10)", 
+        "📂 دمج ملفات الجرد اليومي وتصدير الإكسيل", 
+        "🔍 تقرير الفروقات المستقل (شامل وفوري)",
+        "📱 جرد الموبايل بالباركود والبحث الذكي"
+    ]
 )
 
 # ---------------------------------------------------------
@@ -162,7 +168,7 @@ if main_mode == "📊 التقرير التنفيذي (شهر 9 وشهر 10)":
 # ---------------------------------------------------------
 # القسم الثاني: دمج تقارير الجرد اليومي وتصدير الملفات
 # ---------------------------------------------------------
-else:
+elif main_mode == "📂 دمج ملفات الجرد اليومي وتصدير الإكسيل":
     st.subheader("📂 مركز دمج ملفات الجرد اليومي واستخراج التقارير")
     st.caption("ارمي هنا كل تقارير الجرد اليومية، وسيتم تجميعهم وتوليد ملفات CSV نظيفة وسريعة للتحميل الفوري.")
 
@@ -211,24 +217,223 @@ else:
 
             d_tab1, d_tab2, d_tab3 = st.tabs(["🔥 شيت العجز", "➕ شيت الزيادة", "📚 مرجع الرموز"])
 
-### [Citation: 2]
             with d_tab1:
                 st.subheader("الأصناف التي بها عجز (نقص)")
                 st.dataframe(shortage_df, use_container_width=True, hide_index=True)
-                
                 csv_shortage = shortage_df.to_csv(index=False).encode('utf-8-sig')
-                st.download_button("📥 تحميل ملف العجز (CSV جاهز للإكسيل)", csv_shortage, "تقارير_العجز_اليومي.csv", "text/csv")
+                st.download_button("📥 تحميل ملف العجز", csv_shortage, "تقارير_العجز_اليومي.csv", "text/csv")
 
             with d_tab2:
                 st.subheader("الأصناف التي بها زيادة (فائض)")
                 st.dataframe(surplus_df, use_container_width=True, hide_index=True)
-                
                 csv_surplus = surplus_df.to_csv(index=False).encode('utf-8-sig')
-                st.download_button("📥 تحميل ملف الزيادة (CSV جاهز للإكسيل)", csv_surplus, "تقارير_الزيادة_اليومية.csv", "text/csv")
+                st.download_button("📥 تحميل ملف الزيادة", csv_surplus, "تقارير_الزيادة_اليومية.csv", "text/csv")
 
             with d_tab3:
                 st.subheader("مرجع رموز المواد والأسماء")
                 st.dataframe(reference_df, use_container_width=True, hide_index=True)
-                
                 csv_ref = reference_df.to_csv(index=False).encode('utf-8-sig')
-                st.download_button("📥 تحميل ملف المرجع (CSV جاهز للإكسيل)", csv_ref, "مرجع_الرموز_والاسماء.csv", "text/csv")
+                st.download_button("📥 تحميل ملف المرجع", csv_ref, "مرجع_الرموز_والاسماء.csv", "text/csv")
+
+# ---------------------------------------------------------
+# القسم الثالث: تقرير الفروقات المستقل
+# ---------------------------------------------------------
+elif main_mode == "🔍 تقرير الفروقات المستقل (شامل وفوري)":
+    st.subheader("🔍 تقرير الفروقات المستقل والتحليل الفوري")
+    st.caption("قسم خاص ومستقل لتحليل الفاقد والعجز والزيادة بدقة ومرونة عالية لأي ملفات جرد ترفعها الآن.")
+
+    ind_files = st.file_uploader("ارفع ملفات الجرد للتحليل المستقل (CSV أو Excel):", type=["csv", "xlsx", "xls"], accept_multiple_files=True)
+
+    if ind_files:
+        ind_dfs = []
+        for f in ind_files:
+            try:
+                if f.name.endswith(".csv"):
+                    ind_dfs.append(pd.read_csv(f, encoding="utf-8-sig"))
+                else:
+                    ind_dfs.append(pd.read_excel(f))
+            except Exception as e:
+                st.error(f"خطأ في قراءة الملف {f.name}: {e}")
+
+        if ind_dfs:
+            master_ind = pd.concat(ind_dfs, ignore_index=True)
+
+            c_code = "Code" if "Code" in master_ind.columns else master_ind.columns[0]
+            c_name = "Detail" if "Detail" in master_ind.columns else master_ind.columns[2]
+            c_sys = "SystemQty" if "SystemQty" in master_ind.columns else master_ind.columns[3]
+            c_act = "ActualQty" if "ActualQty" in master_ind.columns else master_ind.columns[4]
+            c_diff = "Difference" if "Difference" in master_ind.columns else master_ind.columns[5]
+
+            master_ind["رمز المادة"] = master_ind[c_code].astype(str).str.strip()
+            master_ind["اسم الصنف"] = master_ind[c_name].astype(str).str.strip()
+            master_ind["الكمية الدفترية"] = pd.to_numeric(master_ind[c_sys], errors="coerce").fillna(0)
+            master_ind["الكمية الفعلية"] = pd.to_numeric(master_ind[c_act], errors="coerce").fillna(0)
+            master_ind["الفرق"] = pd.to_numeric(master_ind[c_diff], errors="coerce").fillna(0)
+
+            final_ind = master_ind.groupby(["رمز المادة", "اسم الصنف"], as_index=False).agg({
+                "الكمية الدفترية": "sum",
+                "الكمية الفعلية": "sum",
+                "الفرق": "sum"
+            })
+
+            final_ind["كمية العجز (الفاقد)"] = final_ind["الفرق"].apply(lambda x: x if x > 0 else 0)
+            final_ind["كمية الزيادة"] = final_ind["الفرق"].apply(lambda x: -x if x < 0 else 0)
+            final_ind["حالة الصنف"] = final_ind["الفرق"].apply(lambda x: "عجز (نقص)" if x > 0 else ("زيادة (فائض)" if x < 0 else "مطابق تماماً"))
+
+            total_items_count = len(final_ind)
+            shortage_count = len(final_ind[final_ind["كمية العجز (الفاقد)"] > 0])
+            surplus_count = len(final_ind[final_ind["كمية الزيادة"] > 0])
+            matched_count = len(final_ind[final_ind["الفرق"] == 0])
+
+            col_a, col_b, col_c, col_d = st.columns(4)
+            col_a.metric("📦 إجمالي الأصناف", f"{total_items_count:,}")
+            col_b.metric("🔥 أصناف عجز", f"{shortage_count:,}")
+            col_c.metric("➕ أصناف زيادة", f"{surplus_count:,}")
+            col_d.metric("✅ أصناف مطابقة", f"{matched_count:,}")
+
+            st.divider()
+
+            t_tab1, t_tab2, t_tab3 = st.tabs(["🔥 تقرير الفاقد والعجز", "➕ تقرير الزيادة", "📋 كافة الفروقات"])
+
+            with t_tab1:
+                st.subheader("الأصناف التي سجلت عجزاً وفاقداً")
+                ind_shortage = final_ind[final_ind["كمية العجز (الفاقد)"] > 0][["رمز المادة", "اسم الصنف", "الكمية الدفترية", "الكمية الفعلية", "كمية العجز (الفاقد)"]].sort_values("كمية العجز (الفاقد)", ascending=False)
+                st.dataframe(ind_shortage, use_container_width=True, hide_index=True)
+                csv_ind_s = ind_shortage.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 تحميل تقرير الفاقد المستقل (CSV)", csv_ind_s, "تقرير_الفاقد_المستقل.csv", "text/csv")
+
+            with t_tab2:
+                st.subheader("الأصناف التي سجلت زيادة")
+                ind_surplus = final_ind[final_ind["كمية الزيادة"] > 0][["رمز المادة", "اسم الصنف", "الكمية الدفترية", "الكمية الفعلية", "كمية الزيادة"]].sort_values("كمية الزيادة", ascending=False)
+                st.dataframe(ind_surplus, use_container_width=True, hide_index=True)
+                csv_ind_su = ind_surplus.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 تحميل تقرير الزيادة المستقل (CSV)", csv_ind_su, "تقرير_الزيادة_المستقل.csv", "text/csv")
+
+            with t_tab3:
+                st.subheader("الشامل الكامل لكل الأصناف")
+                st.dataframe(final_ind[["رمز المادة", "اسم الصنف", "الكمية الدفترية", "الكمية الفعلية", "الفرق", "حالة الصنف"]], use_container_width=True, hide_index=True)
+                csv_all_ind = final_ind.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 تحميل التقرير الشامل المستقل (CSV)", csv_all_ind, "التقرير_الشامل_المستقل.csv", "text/csv")
+    else:
+        st.info("👈 يرجى رفع ملفات الجرد في هذا القسم لعرض التقرير المستقل وتحليل الفاقد والزيادة فوراً.")
+
+# ---------------------------------------------------------
+# القسم الرابع: جرد الموبايل بالباركود والبحث الذكي وتتبع الغير مجرود
+# ---------------------------------------------------------
+else:
+    st.subheader("📱 قسم جرد الموبايل بالباركود والبحث الذكي")
+    st.caption("ارفع ملف الأصناف الأساسي (المرجع)، وابحث بأي جزء من الاسم أو الكود، أو أدخل الباركود لجرد المخزن فوراً ومتابعة الأصناف التي لم تُجرد بعد.")
+
+    base_file = st.file_uploader("📁 ارفع ملف الأصناف الأساسي (شيت يحتوي على: كود/باركود، اسم الصنف، الكمية الدفترية):", type=["xlsx", "xls", "csv"])
+
+    if base_file is not None:
+        try:
+            if base_file.name.endswith(".csv"):
+                base_df = pd.read_csv(base_file, encoding="utf-8-sig")
+            else:
+                base_df = pd.read_excel(base_file)
+
+            # تحديد الأعمدة بمرونة حسب شكل الصفوف المختلفة
+            c_code = base_df.columns[0]
+            c_barcode = base_df.columns[1] if len(base_df.columns) > 1 else base_df.columns[0]
+            c_name = base_df.columns[2] if len(base_df.columns) > 2 else base_df.columns[1]
+            c_sys = base_df.columns[3] if len(base_df.columns) > 3 else base_df.columns[2]
+
+            base_df["رمز المادة"] = base_df[c_code].astype(str).str.strip()
+            base_df["الباركود"] = base_df[c_barcode].astype(str).str.strip()
+            base_df["اسم الصنف"] = base_df[c_name].astype(str).str.strip()
+            base_df["الكمية الدفترية"] = pd.to_numeric(base_df[c_sys], errors="coerce").fillna(0)
+
+            # استخدام الـ Session State لحفظ بيانات الجرد على الموبايل أثناء إدخال الكميات
+            if 'mobile_inventory' not in st.session_state:
+                st.session_state['mobile_inventory'] = {
+                    row["رمز المادة"]: {"اسم": row["اسم الصنف"], "دفطري": row["الكمية الدفترية"], "فعلي": None}
+                    for _, row in base_df.iterrows()
+                }
+
+            st.success("تم تحميل شيت الأصناف الأساسي بنجاح وجاهز للجرد والتفتيش بالموبايل!")
+
+            scan_tab1, scan_tab2, scan_tab3 = st.tabs(["📷 جرد بالباركود / البحث الذكي", "⚠️ الأصناف غير المجرودة", "📥 تصدير تقرير الجرد النهائي"])
+
+            with scan_tab1:
+                st.subheader("🔍 البحث الذكي أو إدخال الكود/الباركود")
+                search_term = st.text_input("اكتب جزء من اسم الصنف، الكود، أو الباركود (بحث تقريبي سريع):")
+
+                target_items = base_df.copy()
+                if search_term:
+                    target_items = target_items[
+                        target_items["رمز المادة"].str.contains(search_term, case=False, na=False) |
+                        target_items["الباركود"].str.contains(search_term, case=False, na=False) |
+                        target_items["اسم الصنف"].str.contains(search_term, case=False, na=False)
+                    ]
+
+                if not target_items.empty:
+                    st.write(f"تم العثور على {len(target_items)} صنف مطابق:")
+                    for idx, row in target_items.head(15).iterrows():
+                        code = row["رمز المادة"]
+                        name = row["اسم الصنف"]
+                        sys_q = row["الكمية الدفترية"]
+                        current_actual = st.session_state['mobile_inventory'][code]["فعلي"]
+
+                        col_x, col_y, col_z = st.columns([3, 1, 1])
+                        col_x.markdown(f"**{name}**\n*(الكود: {code} | الدفتري: {sys_q})*")
+                        
+                        # إدخال الكمية الفعلية للجرد
+                        new_actual = col_y.number_input(
+                            "الفعلي", 
+                            min_value=0.0, 
+                            value=float(current_actual) if current_actual is not None else float(sys_q), 
+                            key=f"act_{code}"
+                        )
+                        
+                        if col_z.button("حفظ الجرد", key=f"btn_{code}"):
+                            st.session_state['mobile_inventory'][code]["فعلي"] = new_actual
+                            st.success(f"تم حفظ جرد صنف: {name}")
+                else:
+                    st.warning("لم يتم العثور على أصناف مطابقة لكلمات البحث.")
+
+            with scan_tab2:
+                st.subheader("⚠️ الأصناف التي لم يتم جردها بعد (من ملف الإكسيل)")
+                ungraced_list = [
+                    {"رمز المادة": k, "اسم الصنف": v["اسم"], "الكمية الدفترية": v["دفطري"]}
+                    for k, v in st.session_state['mobile_inventory'].items() if v["فعلي"] is None
+                ]
+                df_ungraced = pd.DataFrame(ungraced_list)
+                st.info(f"إجمالي الأصناف المتبقية ولم تُجرَد بعد: {len(df_ungraced)} صنف")
+                if not df_ungraced.empty:
+                    st.dataframe(df_ungraced, use_container_width=True, hide_index=True)
+
+            with scan_tab3:
+                st.subheader("📥 تقرير نتائج الجرد النهائي وتصدير الإكسيل")
+                graced_list = []
+                for k, v in st.session_state['mobile_inventory'].items():
+                    if v["فعلي"] is not None:
+                        diff = v["دفطري"] - v["فعلي"]  # موجب = عجز، سالب = زيادة
+                        status = "عجز (نقص)" if diff > 0 else ("زيادة (فائض)" if diff < 0 else "مطابق تماماً")
+                        graced_list.append({
+                            "رمز المادة": k,
+                            "اسم الصنف": v["اسم"],
+                            "الكمية الدفترية": v["دفطري"],
+                            "الكمية الفعلية": v["فعلي"],
+                            "الفرق": diff,
+                            "حالة الصنف": status
+                        })
+
+                if graced_list:
+                    df_final_result = pd.DataFrame(graced_list)
+                    st.dataframe(df_final_result, use_container_width=True, hide_index=True)
+
+                    csv_mob = df_final_result.to_csv(index=False).encode('utf-8-sig')
+                    st.download_button(
+                        "📥 تحميل تقرير الجرد النهائي (CSV جاهز للإكسيل)",
+                        csv_mob,
+                        "تقرير_جرد_الموبايل_النهائي.csv",
+                        "text/csv"
+                    )
+                else:
+                    st.warning("لم يتم جرد أي صنف حتى الان لطباعة أو تصدير التقرير.")
+
+        except Exception as e:
+            st.error(f"حدث خطأ أثناء معالجة ملف الأصناف الأساسي: {e}")
+    else:
+        st.info("👈 يرجى رفع ملف الأصناف الأساسي في هذا القسم لبدء الجرد الذكي عبر الموبايل.")
