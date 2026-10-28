@@ -24,13 +24,13 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المتكامل: تقارير الشهور + تقرير الأسبوع الموحد + دمج اليومي + التقرير المستقل + الجرد السريع")
+st.caption("النظام المتكامل: تقارير الشهور + تقرير الأسبوع الشامل + دمج اليومي + التقرير المستقل + الجرد السريع")
 
 main_mode = st.sidebar.radio(
     "📂 اختر القسم المطلوب:",
     [
         "📊 التقرير التنفيذي (شهر 9 وشهر 10)", 
-        "📅 تقرير الأسبوع (متابعة محمد قطان - رفع ملفات متعددة دفعة واحدة)",
+        "📅 تقرير الأسبوع (متابعة محمد قطان - تحليل الفاقد وأكثر 20 صنف عجز)",
         "📂 دمج ملفات الجرد اليومي وتصدير الإكسيل", 
         "🔍 تقرير الفروقات المستقل (شامل وفوري)",
         "📱 الجرد السريع والبحث الذكي بالموبايل"
@@ -177,14 +177,14 @@ if main_mode == "📊 التقرير التنفيذي (شهر 9 وشهر 10)":
         st.info("👈 يرجى رفع ملف الإكسيل لعرض التقارير.")
 
 # ---------------------------------------------------------
-# القسم الثاني: تقرير الأسبوع (متابعة محمد قطان - زرار رفع واحد لملفات الأسبوع كله)
+# القسم الثاني: تقرير الأسبوع (متابعة محمد قطان مع أعلى 20 صنف عجز)
 # ---------------------------------------------------------
-elif main_mode == "📅 تقرير الأسبوع (متابعة محمد قطان - رفع ملفات متعددة دفعة واحدة)":
-    st.subheader("📅 تقرير الأسبوع — متابعة محمد قطان (تحليل الفاقد والعجز الأسبوعي)")
-    st.caption("ارمي هنا كل إكسيلات الأسبوع دفعة واحدة في زرار الرفع أدناه، وسيتم تحليلها أوتوماتيكياً لإظهار المواد المعجزة والفروقات وزر التحميل الفوري.")
+elif main_mode == "📅 تقرير الأسبوع (متابعة محمد قطان - تحليل الفاقد وأكثر 20 صنف عجز)":
+    st.subheader("📅 تقرير الأسبوع — متابعة محمد قطان (تحليل الفاقد وأكثر 20 صنف عجز)")
+    st.caption("ارفع هنا جميع ملفات جرد الأسبوع دفعة واحدة، وسيتم استخراج تقرير العجز والزيادة وأكثر 20 صنف يعانون من عجز مستمر لمتابعتها وضبطها.")
 
     weekly_files = st.file_uploader(
-        "📁 ارفع جميع ملفات إكسيل/CSV الخاصة بأيام الأسبوع دفعة واحدة:", 
+        "📁 ارفع ملفات إكسيل الأسبوع كله دفعة واحدة:", 
         type=["xlsx", "xls", "csv"], 
         accept_multiple_files=True
     )
@@ -200,7 +200,6 @@ elif main_mode == "📅 تقرير الأسبوع (متابعة محمد قطا�
 
             combined_week = pd.concat(week_dfs, ignore_index=True)
 
-            # مطابقة الأعمدة بدقة بناءً على هيكل ملفات الجرد الخاصة بك (Code, Detail, SystemQty, ActualQty, Difference)
             c_code = "Code" if "Code" in combined_week.columns else combined_week.columns[0]
             c_name = "Detail" if "Detail" in combined_week.columns else combined_week.columns[2]
             c_sys = "SystemQty" if "SystemQty" in combined_week.columns else combined_week.columns[3]
@@ -221,7 +220,6 @@ elif main_mode == "📅 تقرير الأسبوع (متابعة محمد قطا�
             combined_week["الكمية الفعلية"] = pd.to_numeric(combined_week[c_act], errors="coerce").fillna(0)
             combined_week["الفرق الأسبوعي"] = pd.to_numeric(combined_week[c_diff], errors="coerce").fillna(0)
 
-            # تجميع البيانات أسبوعياً
             weekly_agg = combined_week.groupby(["كود الصنف", "اسم الصنف"], as_index=False).agg({
                 "الكمية الدفترية": "sum",
                 "الكمية الفعلية": "sum",
@@ -248,24 +246,24 @@ elif main_mode == "📅 تقرير الأسبوع (متابعة محمد قطا�
             st.divider()
 
             w_tab1, w_tab2, w_tab3, w_tab4 = st.tabs([
-                "🚨 المواد الأكثر عجزاً وتحتاج ضبط عاجل", 
+                "🚨 أكثر 20 صنف بهم عجز (تحتاج ضبط)", 
                 "🔥 تقرير العجز الأسبوعي", 
                 "➕ تقرير الزيادة الأسبوعية", 
                 "📋 التقرير الأسبوعي الشامل"
             ])
 
             with w_tab1:
-                st.subheader("🚨 المواد التي معجزة بكثرة وفاقدها عالي خلال الأسبوع")
-                st.caption("أعلى الأصناف تسجيلاً للعجز والنقص طوال الأسبوع لمراجعتها وضبطها.")
-                top_def = weekly_agg[weekly_agg["كمية العجز (الفاقد)"] > 0].sort_values("كمية العجز (الفاقد)", ascending=False).head(30)
-                st.dataframe(top_def, use_container_width=True, hide_index=True)
+                st.subheader("🚨 أكثر 20 صنف تسجيلاً للعجز والففاقد خلال الأسبوع")
+                st.caption("هذه أهم قائمة لمتابعة الفاقد الحاد وضبط المواد التي تتعرض لنقص متكرر.")
+                top_20_def = weekly_agg[weekly_agg["كمية العجز (الفاقد)"] > 0].sort_values("كمية العجز (الفاقد)", ascending=False).head(20)
+                st.dataframe(top_20_def, use_container_width=True, hide_index=True)
                 
-                if not top_def.empty:
-                    csv_top_def = top_def.to_csv(index=False).encode('utf-8-sig')
+                if not top_20_def.empty:
+                    csv_top_20 = top_20_def.to_csv(index=False).encode('utf-8-sig')
                     st.download_button(
-                        "📥 تحميل تقرير المواد المعجزة (CSV جاهز للإكسيل)",
-                        csv_top_def,
-                        "تقرير_المواد_المعجزة_أسبوعياً.csv",
+                        "📥 تحميل تقرير أكثر 20 صنف عجز (CSV)",
+                        csv_top_20,
+                        "اكثر_20_صنف_بهم_عجز_اسبوعيا.csv",
                         "text/csv"
                     )
 
@@ -294,7 +292,7 @@ elif main_mode == "📅 تقرير الأسبوع (متابعة محمد قطا�
         except Exception as e:
             st.error(f"حدث خطأ أثناء معالجة ملفات الأسبوع: {e}")
     else:
-        st.info("👈 ارفع ملفات إكسيل الأسبوع في زرار الرفع أعلاه لعرض تقرير الفاقد والعجز الأسبوعي الشامل.")
+        st.info("👈 ارفع ملفات إكسيل الأسبوع في زرار الرفع أعلاه لعرض تقرير العجز وأكثر 20 صنف عجز أسبوعياً.")
 
 # ---------------------------------------------------------
 # القسم الثالث: دمج تقارير الجرد اليومي وتصدير الإكسيل
@@ -348,8 +346,8 @@ else:
             base_df["الصنف والمادة"] = base_df[c_material].astype(str).str.strip()
             base_df["الكمية النظامية"] = pd.to_numeric(base_df[c_qty], errors="coerce").fillna(0)
 
-            if 'mobile_inventory_v12' not in st.session_state:
-                st.session_state['mobile_inventory_v12'] = {
+            if 'mobile_inventory_v13' not in st.session_state:
+                st.session_state['mobile_inventory_v13'] = {
                     row["الصنف والمادة"]: {"نظامي": row["الكمية النظامية"], "فعلي": row["الكمية النظامية"]}
                     for _, row in base_df.iterrows()
                 }
@@ -374,10 +372,10 @@ else:
                     item_name = row["الصنف والمادة"]
                     sys_q = row["الكمية النظامية"]
                     
-                    if item_name not in st.session_state['mobile_inventory_v12']:
-                        st.session_state['mobile_inventory_v12'][item_name] = {"نظامي": sys_q, "فعلي": sys_q}
+                    if item_name not in st.session_state['mobile_inventory_v13']:
+                        st.session_state['mobile_inventory_v13'][item_name] = {"نظامي": sys_q, "فعلي": sys_q}
 
-                    current_actual = st.session_state['mobile_inventory_v12'][item_name]["فعلي"]
+                    current_actual = st.session_state['mobile_inventory_v13'][item_name]["فعلي"]
 
                     col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
                     col1.markdown(f"**{item_name}**")
@@ -386,11 +384,11 @@ else:
                     new_act = col3.number_input(
                         "الفعلي", 
                         value=float(current_actual), 
-                        key=f"act_direct_v12_{idx}",
+                        key=f"act_direct_v13_{idx}",
                         label_visibility="collapsed"
                     )
                     
-                    st.session_state['mobile_inventory_v12'][item_name]["فعلي"] = new_act
+                    st.session_state['mobile_inventory_v13'][item_name]["فعلي"] = new_act
                     
                     diff = new_act - sys_q
                     
@@ -406,7 +404,7 @@ else:
                 st.subheader("⚠️ الأصناف التي لم يتم تعديلها أو جردها بعد (مطابقة للنظام)")
                 ungraced_list = [
                     {"الصنف والمادة": k, "الكمية النظامية": v["نظامي"], "الكمية الفعلية": v["فعلي"]}
-                    for k, v in st.session_state['mobile_inventory_v12'].items() if v["نظامي"] == v["فعلي"]
+                    for k, v in st.session_state['mobile_inventory_v13'].items() if v["نظامي"] == v["فعلي"]
                 ]
                 df_ungraced = pd.DataFrame(ungraced_list)
                 st.info(f"إجمالي الأصناف التي بنفس الكمية النظامية: {len(df_ungraced)} صنف")
@@ -416,7 +414,7 @@ else:
             with scan_tab3:
                 st.subheader("📥 تقرير نتائج الجرد النهائي وتصدير الإكسيل")
                 final_list = []
-                for k, v in st.session_state['mobile_inventory_v12'].items():
+                for k, v in st.session_state['mobile_inventory_v13'].items():
                     diff = v["فعلي"] - v["نظامي"]
                     if diff < 0:
                         status = "عجز (نقص)"
@@ -448,3 +446,4 @@ else:
             st.error(f"حدث خطأ أثناء معالجة ملف المخزن: {e}")
     else:
         st.info("👈 يرجى رفع ملف المخزن الأساسي (جرد المخزن 22) في **القسم الخامس** لبدء الجرد السريع وتعديل الكميات.")
+        
