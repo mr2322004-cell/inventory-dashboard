@@ -24,12 +24,12 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المتكامل: لوحة مهام الأسبوع + تقارير الشهور + تحليل الفاقد + الجرد السريع")
+st.caption("النظام المتكامل: لوحة مهام الأسبوع بالمجموعات والأقسام + تقارير الشهور + تحليل الفاقد + الجرد السريع")
 
 main_mode = st.sidebar.radio(
     "📂 اختر القسم المطلوب:",
     [
-        "✅ مهام جرد الأسبوع (To-Do الذكية ومتابعة الإنجاز)",
+        "✅ مهام ومجموعات جرد الأسبوع (حسب جدول الأيام)",
         "📊 التقرير التنفيذي (شهر 9 وشهر 10)", 
         "📅 تقرير الأسبوع (متابعة محمد قطان - تحليل الفاقد وأكثر 20 صنف عجز)",
         "📂 دمج ملفات الجرد اليومي وتصدير الإكسيل", 
@@ -39,69 +39,73 @@ main_mode = st.sidebar.radio(
 )
 
 # ---------------------------------------------------------
-# القسم الأول: مهام جرد الأسبوع (To-Do List الذكية مع إعادة تعيين أسبوعية)
+# القسم الأول: مهام ومجموعات جرد الأسبوع (مترتبة بالأيام والمجموعات تحت بعضها)
 # ---------------------------------------------------------
-if main_mode == "✅ مهام جرد الأسبوع (To-Do الذكية ومتابعة الإنجاز)":
-    st.subheader("✅ لوحة مهام جرد الأسبوع (متابعة محمد قطان)")
-    st.caption("علم على المهام التي تم إنجازها. في نهاية الأسبوع يظهر لك تقرير بما تم وما لم يُتخذ، ومع بداية كل يوم سبت يتم تصفير المهام أوتوماتيكياً!")
+if main_mode == "✅ مهام ومجموعات جرد الأسبوع (حسب جدول الأيام)":
+    st.subheader("✅ جدول ومجموعات جرد الأسبوع (متابعة محمد قطان)")
+    st.caption("عرض مجموعات الأقسام مرتبة تحت بعضها حسب الأيام (السبت ثلاجة، الثلاثاء مخزن، وباقي الأيام)، مع حساب نسبة الإنجاز ومعرفة ما تم وما لم يُتخذ.")
 
     today = datetime.date.today()
     current_week_number = today.isocalendar()[1]
 
-    if 'todo_week_num' not in st.session_state or st.session_state['todo_week_num'] != current_week_number:
-        st.session_state['todo_week_num'] = current_week_number
-        st.session_state['tasks_state'] = {
-            "السبت: جرد الثلاجة (الجبن، اللانشون، الألبان، الخضار، الصوصات)": False,
-            "الأحد: مخزن - الدفعة الأولى (عصائر، إيس كوفي، معلبيات، تونة، مياه)": False,
-            "الإثنين: مخزن - الدفعة الثانية (شيبس، سناكس، بسكويت، نودلز، بقوليات صلبة)": False,
-            "الثلاثاء: جرد المخزن الشامل والرفوف (بهارات، زيت، سكر، كورن فليكس)": False,
-            "الأربعاء: العناية الشخصية ومنتجات الاستخدام مرة واحدة (مناديل، حفاضات، تنظيف)": False,
-            "الخميس: المتبقيات والأقسام الإضافية (مشروم، ورق عنب، مخلل، صلصة)": False,
-        }
+    # قائمة المهام مرتبة بالمجموعات والأيام بناءً على جدولك الدقيق
+    tasks_schedule = {
+        "🧊 السبت: جرد الثلاجة (الجبن، اللانشون، الألبان، الخضار، الصوصات، زبدة، سمنة)": False,
+        "🥤 الأحد (الدفعة الأولى): عصائر، إيس كوفي، معلبيات، حلاوة، عسل، مربى، تونة، مياه": False,
+        "🍫 الإثنين (الدفعة الثانية): شيبس وسناكس، بسكويت وحلويات، نودلز، بقوليات صلبة، إيس كريم": False,
+        "📦 الثلاثاء: جرد المخزن الشامل والرفوف (بهارات، زيت وزيتون، دقيق وسكر، كورن فليكس)": False,
+        "🧴 الأربعاء: العناية الشخصية واستخدام مرة واحدة (مناديل، حفاضات، تنظيف، شامبو، بلسم)": False,
+        "🥒 الخميس: المتبقيات والأقسام الإضافية (مشروم، ورق عنب، مخلل، صلصة، ضيافة العيد)": False,
+    }
+
+    if 'todo_week_num_v2' not in st.session_state or st.session_state['todo_week_num_v2'] != current_week_number:
+        st.session_state['todo_week_num_v2'] = current_week_number
+        st.session_state['tasks_state_v2'] = tasks_schedule
 
     st.write("---")
-    st.markdown("### 📋 مهام الأسبوع الحالي:")
+    st.markdown("### 📋 مجموعات وميمات جرد الأسبوع الحالي (مرتبة تحت بعضها):")
 
     completed_count = 0
-    total_tasks = len(st.session_state['tasks_state'])
+    total_tasks = len(st.session_state['tasks_state_v2'])
 
-    for task_name in list(st.session_state['tasks_state'].keys()):
-        is_checked = st.checkbox(task_name, value=st.session_state['tasks_state'][task_name], key=f"task_{task_name}")
-        st.session_state['tasks_state'][task_name] = is_checked
+    for task_name in list(st.session_state['tasks_state_v2'].keys()):
+        is_checked = st.checkbox(task_name, value=st.session_state['tasks_state_v2'][task_name], key=f"task_v2_{task_name}")
+        st.session_state['tasks_state_v2'][task_name] = is_checked
         if is_checked:
             completed_count += 1
 
     st.divider()
 
-    st.subheader("📊 تقرير إنجاز المهام الأسبوعي")
+    # تقرير إنجاز الأسبوع والنسبة المئوية
+    st.subheader("📊 تقرير إنجاز المجموعات أسبوعياً")
     progress_pct = (completed_count / total_tasks) * 100
     st.progress(progress_pct / 100)
-    st.write(f"نسبة الإنجاز للأسبوع الحالي: **{progress_pct:.0f}%** ({completed_count} من {total_tasks} مهام مكتملة)")
+    st.write(f"نسبة الإنجاز الإجمالية للأسبوع الحالي: **{progress_pct:.1f}%** ({completed_count} من {total_tasks} مجموعات مكتملة)")
 
     col_res1, col_res2 = st.columns(2)
 
     with col_res1:
-        st.markdown("### ✅ المهام التي تم إنجازها (تاخدت):")
-        done_list = [t for t, status in st.session_state['tasks_state'].items() if status]
+        st.markdown("### ✅ المجموعات التي تم إنجازها (تاخدت):")
+        done_list = [t for t, status in st.session_state['tasks_state_v2'].items() if status]
         if done_list:
             for d in done_list:
                 st.markdown(f"- ✅ {d}")
         else:
-            st.info("لم يتم انجاز أي مهمة بعد هذا الأسبوع.")
+            st.info("لم يتم إنجاز أي مجموعة بعد هذا الأسبوع.")
 
     with col_res2:
-        st.markdown("### ❌ المهام التي لم تُنجز بعد (متاخدتش):")
-        pending_list = [t for t, status in st.session_state['tasks_state'].items() if not status]
+        st.markdown("### ❌ المجموعات التي لم تُنجز بعد (متاخدتش / ساقطة):")
+        pending_list = [t for t, status in st.session_state['tasks_state_v2'].items() if not status]
         if pending_list:
             for p in pending_list:
                 st.markdown(f"- ❌ {p}")
         else:
-            st.success("عاش جداً! تم إنجاز كافة مهام الأسبوع بالكامل.")
+            st.success("عاش جداً! تم إنجاز كافة مجموعات الأسبوع بالكامل.")
 
     st.divider()
-    if st.button("🔄 إعادة تعيين المهام يدوياً (صفحة جديدة)"):
-        for k in st.session_state['tasks_state']:
-            st.session_state['tasks_state'][k] = False
+    if st.button("🔄 إعادة تعيين المهام يدوياً (أسبوع جديد)"):
+        for k in st.session_state['tasks_state_v2']:
+            st.session_state['tasks_state_v2'][k] = False
         st.rerun()
 
 # ---------------------------------------------------------
@@ -244,11 +248,11 @@ elif main_mode == "📊 التقرير التنفيذي (شهر 9 وشهر 10)":
         st.info("👈 يرجى رفع ملف الإكسيل لعرض التقارير.")
 
 # ---------------------------------------------------------
-# القسم الثالث: تقرير الأسبوع (متابعة محمد قطان مع أعلى 20 صنف عجز)
+# القسم الثالث: تقرير الأسبوع
 # ---------------------------------------------------------
 elif main_mode == "📅 تقرير الأسبوع (متابعة محمد قطان - تحليل الفاقد وأكثر 20 صنف عجز)":
     st.subheader("📅 تقرير الأسبوع — متابعة محمد قطان (تحليل الفاقد وأكثر 20 صنف عجز)")
-    st.caption("ارفع هنا جميع ملفات جرد الأسبوع دفعة واحدة، وسيتم استخراج تقرير العجز والزيادة وأكثر 20 صنف يعانون من عجز مستمر لمتابعتها وضبطها.")
+    st.caption("ارفع هنا جميع ملفات جرد الأسبوع دفعة واحدة، وسيتم استخراج تقرير العجز والزيادة وأكثر 20 صنف عجز.")
 
     weekly_files = st.file_uploader(
         "📁 ارفع ملفات إكسيل الأسبوع كله دفعة واحدة:", 
@@ -321,18 +325,11 @@ elif main_mode == "📅 تقرير الأسبوع (متابعة محمد قطا�
 
             with w_tab1:
                 st.subheader("🚨 أكثر 20 صنف تسجيلاً للعجز والففاقد خلال الأسبوع")
-                st.caption("هذه أهم قائمة لمتابعة الفاقد الحاد وضبط المواد التي تتعرض لنقص متكرر.")
                 top_20_def = weekly_agg[weekly_agg["كمية العجز (الفاقد)"] > 0].sort_values("كمية العجز (الفاقد)", ascending=False).head(20)
                 st.dataframe(top_20_def, use_container_width=True, hide_index=True)
-                
                 if not top_20_def.empty:
                     csv_top_20 = top_20_def.to_csv(index=False).encode('utf-8-sig')
-                    st.download_button(
-                        "📥 تحميل تقرير أكثر 20 صنف عجز (CSV)",
-                        csv_top_20,
-                        "اكثر_20_صنف_بهم_عجز_اسبوعيا.csv",
-                        "text/csv"
-                    )
+                    st.download_button("📥 تحميل تقرير أكثر 20 صنف عجز (CSV)", csv_top_20, "اكثر_20_صنف_بهم_عجز_اسبوعيا.csv", "text/csv")
 
             with w_tab2:
                 st.subheader("🔥 تقرير العجز أسبوعياً")
@@ -413,8 +410,8 @@ else:
             base_df["الصنف والمادة"] = base_df[c_material].astype(str).str.strip()
             base_df["الكمية النظامية"] = pd.to_numeric(base_df[c_qty], errors="coerce").fillna(0)
 
-            if 'mobile_inventory_v15' not in st.session_state:
-                st.session_state['mobile_inventory_v15'] = {
+            if 'mobile_inventory_v16' not in st.session_state:
+                st.session_state['mobile_inventory_v16'] = {
                     row["الصنف والمادة"]: {"نظامي": row["الكمية النظامية"], "فعلي": row["الكمية النظامية"]}
                     for _, row in base_df.iterrows()
                 }
@@ -439,10 +436,10 @@ else:
                     item_name = row["الصنف والمادة"]
                     sys_q = row["الكمية النظامية"]
                     
-                    if item_name not in st.session_state['mobile_inventory_v15']:
-                        st.session_state['mobile_inventory_v15'][item_name] = {"نظامي": sys_q, "فعلي": sys_q}
+                    if item_name not in st.session_state['mobile_inventory_v16']:
+                        st.session_state['mobile_inventory_v16'][item_name] = {"نظامي": sys_q, "فعلي": sys_q}
 
-                    current_actual = st.session_state['mobile_inventory_v15'][item_name]["فعلي"]
+                    current_actual = st.session_state['mobile_inventory_v16'][item_name]["فعلي"]
 
                     col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
                     col1.markdown(f"**{item_name}**")
@@ -451,11 +448,11 @@ else:
                     new_act = col3.number_input(
                         "الفعلي", 
                         value=float(current_actual), 
-                        key=f"act_direct_v15_{idx}",
+                        key=f"act_direct_v16_{idx}",
                         label_visibility="collapsed"
                     )
                     
-                    st.session_state['mobile_inventory_v15'][item_name]["فعلي"] = new_act
+                    st.session_state['mobile_inventory_v16'][item_name]["فعلي"] = new_act
                     
                     diff = new_act - sys_q
                     
@@ -471,7 +468,7 @@ else:
                 st.subheader("⚠️ الأصناف التي لم يتم تعديلها أو جردها بعد (مطابقة للنظام)")
                 ungraced_list = [
                     {"الصنف والمادة": k, "الكمية النظامية": v["نظامي"], "الكمية الفعلية": v["فعلي"]}
-                    for k, v in st.session_state['mobile_inventory_v15'].items() if v["نظامي"] == v["فعلي"]
+                    for k, v in st.session_state['mobile_inventory_v16'].items() if v["نظامي"] == v["فعلي"]
                 ]
                 df_ungraced = pd.DataFrame(ungraced_list)
                 st.info(f"إجمالي الأصناف التي بنفس الكمية النظامية: {len(df_ungraced)} صنف")
@@ -481,7 +478,7 @@ else:
             with scan_tab3:
                 st.subheader("📥 تقرير نتائج الجرد النهائي وتصدير الإكسيل")
                 final_list = []
-                for k, v in st.session_state['mobile_inventory_v15'].items():
+                for k, v in st.session_state['mobile_inventory_v16'].items():
                     diff = v["فعلي"] - v["نظامي"]
                     if diff < 0:
                         status = "عجز (نقص)"
@@ -513,4 +510,3 @@ else:
             st.error(f"حدث خطأ أثناء معالجة ملف المخزن: {e}")
     else:
         st.info("👈 يرجى رفع ملف المخزن الأساسي (جرد المخزن 22) في **القسم السادس** لبدء الجرد السريع وتعديل الكميات.")
-    
