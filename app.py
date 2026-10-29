@@ -24,7 +24,7 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المتكامل: لوحة مهام الأسبوع بالمجموعات والأقسام + تقارير الشهور + تحليل الفاقد + الجرد السريع")
+st.caption("النظام المتكامل: لوحة مهام الأسبوع بالمجموعات والأقسام المترتبة + تقارير الشهور + تحليل الفاقد + الجرد السريع")
 
 main_mode = st.sidebar.radio(
     "📂 اختر القسم المطلوب:",
@@ -43,34 +43,34 @@ main_mode = st.sidebar.radio(
 # ---------------------------------------------------------
 if main_mode == "✅ مهام ومجموعات جرد الأسبوع (حسب جدول الأيام)":
     st.subheader("✅ جدول ومجموعات جرد الأسبوع (متابعة محمد قطان)")
-    st.caption("عرض مجموعات الأقسام مرتبة تحت بعضها حسب الأيام (السبت ثلاجة، الثلاثاء مخزن، وباقي الأيام)، مع حساب نسبة الإنجاز ومعرفة ما تم وما لم يُتخذ.")
+    st.caption("عرض مجموعات الأقسام مرتبة تحت بعضها حسب الأيام، مع حساب نسبة الإنجاز ومعرفة المجموعات الساقطة والمتاخدة.")
 
     today = datetime.date.today()
     current_week_number = today.isocalendar()[1]
 
-    # قائمة المهام مرتبة بالمجموعات والأيام بناءً على جدولك الدقيق
+    # ترتيب المجموعات تحت بعضها بناءً على جدولك المعتمد
     tasks_schedule = {
         "🧊 السبت: جرد الثلاجة (الجبن، اللانشون، الألبان، الخضار، الصوصات، زبدة، سمنة)": False,
-        "🥤 الأحد (الدفعة الأولى): عصائر، إيس كوفي، معلبيات، حلاوة، عسل، مربى، تونة، مياه": False,
-        "🍫 الإثنين (الدفعة الثانية): شيبس وسناكس، بسكويت وحلويات، نودلز، بقوليات صلبة، إيس كريم": False,
-        "📦 الثلاثاء: جرد المخزن الشامل والرفوف (بهارات، زيت وزيتون، دقيق وسكر، كورن فليكس)": False,
-        "🧴 الأربعاء: العناية الشخصية واستخدام مرة واحدة (مناديل، حفاضات، تنظيف، شامبو، بلسم)": False,
-        "🥒 الخميس: المتبقيات والأقسام الإضافية (مشروم، ورق عنب، مخلل، صلصة، ضيافة العيد)": False,
+        "🗓️ الأحد والأربعاء (الدفعة الأولى): مناديل، حفاضات، مواد التنظيف، غسيل الملابس والصحون، عناية شخصية": False,
+        "🗓️ الإثنين: شيبس و سناكس، بسكويت وعلويات، نودلز، بقوليات سابية، إيس كريم، تمور، كاندي": False,
+        "📦 الثلاثاء: جرد المخزن الشامل (بهارات، زيت وزيتون، دقيق وسكر، كورن فليكس، بن، حبوب)": False,
+        "🗓️ الأربعاء والسبت (الدفعة الثانية): أخري استخدام مرة واحدة، بطاريات، منعمات الأقمشة، معطر جو، مبيدات حشرية": False,
+        "🗓️ الخميس: المتبقيات والأقسام الإضافية (مشروم، ورق عنب، مخلل، صلصة، ضيافة العيد)": False,
     }
 
-    if 'todo_week_num_v2' not in st.session_state or st.session_state['todo_week_num_v2'] != current_week_number:
-        st.session_state['todo_week_num_v2'] = current_week_number
-        st.session_state['tasks_state_v2'] = tasks_schedule
+    if 'todo_week_num_v3' not in st.session_state or st.session_state['todo_week_num_v3'] != current_week_number:
+        st.session_state['todo_week_num_v3'] = current_week_number
+        st.session_state['tasks_state_v3'] = tasks_schedule
 
     st.write("---")
     st.markdown("### 📋 مجموعات وميمات جرد الأسبوع الحالي (مرتبة تحت بعضها):")
 
     completed_count = 0
-    total_tasks = len(st.session_state['tasks_state_v2'])
+    total_tasks = len(st.session_state['tasks_state_v3'])
 
-    for task_name in list(st.session_state['tasks_state_v2'].keys()):
-        is_checked = st.checkbox(task_name, value=st.session_state['tasks_state_v2'][task_name], key=f"task_v2_{task_name}")
-        st.session_state['tasks_state_v2'][task_name] = is_checked
+    for task_name in list(st.session_state['tasks_state_v3'].keys()):
+        is_checked = st.checkbox(task_name, value=st.session_state['tasks_state_v3'][task_name], key=f"task_v3_{task_name}")
+        st.session_state['tasks_state_v3'][task_name] = is_checked
         if is_checked:
             completed_count += 1
 
@@ -78,7 +78,7 @@ if main_mode == "✅ مهام ومجموعات جرد الأسبوع (حسب ج�
 
     # تقرير إنجاز الأسبوع والنسبة المئوية
     st.subheader("📊 تقرير إنجاز المجموعات أسبوعياً")
-    progress_pct = (completed_count / total_tasks) * 100
+    progress_pct = (completed_count / total_tasks) * 100 if total_tasks > 0 else 0
     st.progress(progress_pct / 100)
     st.write(f"نسبة الإنجاز الإجمالية للأسبوع الحالي: **{progress_pct:.1f}%** ({completed_count} من {total_tasks} مجموعات مكتملة)")
 
@@ -86,7 +86,7 @@ if main_mode == "✅ مهام ومجموعات جرد الأسبوع (حسب ج�
 
     with col_res1:
         st.markdown("### ✅ المجموعات التي تم إنجازها (تاخدت):")
-        done_list = [t for t, status in st.session_state['tasks_state_v2'].items() if status]
+        done_list = [t for t, status in st.session_state['tasks_state_v3'].items() if status]
         if done_list:
             for d in done_list:
                 st.markdown(f"- ✅ {d}")
@@ -95,7 +95,7 @@ if main_mode == "✅ مهام ومجموعات جرد الأسبوع (حسب ج�
 
     with col_res2:
         st.markdown("### ❌ المجموعات التي لم تُنجز بعد (متاخدتش / ساقطة):")
-        pending_list = [t for t, status in st.session_state['tasks_state_v2'].items() if not status]
+        pending_list = [t for t, status in st.session_state['tasks_state_v3'].items() if not status]
         if pending_list:
             for p in pending_list:
                 st.markdown(f"- ❌ {p}")
@@ -104,8 +104,8 @@ if main_mode == "✅ مهام ومجموعات جرد الأسبوع (حسب ج�
 
     st.divider()
     if st.button("🔄 إعادة تعيين المهام يدوياً (أسبوع جديد)"):
-        for k in st.session_state['tasks_state_v2']:
-            st.session_state['tasks_state_v2'][k] = False
+        for k in st.session_state['tasks_state_v3']:
+            st.session_state['tasks_state_v3'][k] = False
         st.rerun()
 
 # ---------------------------------------------------------
@@ -410,8 +410,8 @@ else:
             base_df["الصنف والمادة"] = base_df[c_material].astype(str).str.strip()
             base_df["الكمية النظامية"] = pd.to_numeric(base_df[c_qty], errors="coerce").fillna(0)
 
-            if 'mobile_inventory_v16' not in st.session_state:
-                st.session_state['mobile_inventory_v16'] = {
+            if 'mobile_inventory_v17' not in st.session_state:
+                st.session_state['mobile_inventory_v17'] = {
                     row["الصنف والمادة"]: {"نظامي": row["الكمية النظامية"], "فعلي": row["الكمية النظامية"]}
                     for _, row in base_df.iterrows()
                 }
@@ -436,10 +436,10 @@ else:
                     item_name = row["الصنف والمادة"]
                     sys_q = row["الكمية النظامية"]
                     
-                    if item_name not in st.session_state['mobile_inventory_v16']:
-                        st.session_state['mobile_inventory_v16'][item_name] = {"نظامي": sys_q, "فعلي": sys_q}
+                    if item_name not in st.session_state['mobile_inventory_v17']:
+                        st.session_state['mobile_inventory_v17'][item_name] = {"نظامي": sys_q, "فعلي": sys_q}
 
-                    current_actual = st.session_state['mobile_inventory_v16'][item_name]["فعلي"]
+                    current_actual = st.session_state['mobile_inventory_v17'][item_name]["فعلي"]
 
                     col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
                     col1.markdown(f"**{item_name}**")
@@ -448,11 +448,11 @@ else:
                     new_act = col3.number_input(
                         "الفعلي", 
                         value=float(current_actual), 
-                        key=f"act_direct_v16_{idx}",
+                        key=f"act_direct_v17_{idx}",
                         label_visibility="collapsed"
                     )
                     
-                    st.session_state['mobile_inventory_v16'][item_name]["فعلي"] = new_act
+                    st.session_state['mobile_inventory_v17'][item_name]["فعلي"] = new_act
                     
                     diff = new_act - sys_q
                     
@@ -468,7 +468,7 @@ else:
                 st.subheader("⚠️ الأصناف التي لم يتم تعديلها أو جردها بعد (مطابقة للنظام)")
                 ungraced_list = [
                     {"الصنف والمادة": k, "الكمية النظامية": v["نظامي"], "الكمية الفعلية": v["فعلي"]}
-                    for k, v in st.session_state['mobile_inventory_v16'].items() if v["نظامي"] == v["فعلي"]
+                    for k, v in st.session_state['mobile_inventory_v17'].items() if v["نظامي"] == v["فعلي"]
                 ]
                 df_ungraced = pd.DataFrame(ungraced_list)
                 st.info(f"إجمالي الأصناف التي بنفس الكمية النظامية: {len(df_ungraced)} صنف")
@@ -478,7 +478,7 @@ else:
             with scan_tab3:
                 st.subheader("📥 تقرير نتائج الجرد النهائي وتصدير الإكسيل")
                 final_list = []
-                for k, v in st.session_state['mobile_inventory_v16'].items():
+                for k, v in st.session_state['mobile_inventory_v17'].items():
                     diff = v["فعلي"] - v["نظامي"]
                     if diff < 0:
                         status = "عجز (نقص)"
