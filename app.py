@@ -24,12 +24,13 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المتكامل: معادلة الجرد اليومي المدمج (تصدير إكسيل قياسي ومنسق) + تقارير الأسبوع + الجرد السريع")
+st.caption("النظام المتكامل: التصدير بصيغة Excel 97-2003 (.xls) القديمة المتوافقة مع نظامك تماماً")
 
 main_mode = st.sidebar.radio(
     "📂 اختر القسم المطلوب:",
     [
-        "🧮 معادلة الجرد اليومي المدمج (الفصل والتصدير الفوري)",
+        "🧮 معادلة الجرد اليومي المدمج (الفصل والتصدير بصيغة .xls القديمة)",
+        "📥 استيراد ومعالجة ملفات المدخلات (.xls)",
         "✅ مهام ومجموعات جرد الأسبوع (حسب جدول الأيام)",
         "📊 التقرير التنفيذي (شهر 9 وشهر 10)", 
         "📅 تقرير الأسبوع (متابعة محمد قطان - تحليل الفاقد وأكثر 20 صنف عجز)",
@@ -52,19 +53,72 @@ def format_code_as_text(val):
         pass
     return val_str
 
-# دالة تصدير ملفات Excel بصيغة منسقة واحترافية
-def convert_df_to_excel(df):
+# دالة لتصدير الملفات بصيغة إكسيل القديمة (.xls) بدون عناوين وهيدر
+def convert_df_to_xls(df_to_export):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='تقرير المخزن')
+        df_to_export.to_excel(writer, index=False, header=False, sheet_name='Sheet1')
     return output.getvalue()
 
+@st.cache_data
+def load_master_codes():
+    try:
+        df_m = pd.read_excel("رمز المادة.xlsx")
+        code_map = {}
+        for val in df_m.iloc[:, 0].dropna():
+            val_str = str(val).strip()
+            if '-' in val_str:
+                p = val_str.split('-', 1)
+                c_clean = format_code_as_text(p[0])
+                n_clean = p[1].strip()
+                code_map[c_clean] = n_clean
+        return code_map
+    except:
+        return {}
+
+master_code_dict = load_master_codes()
+
 # ---------------------------------------------------------
-# القسم الأول: معادلة الجرد اليومي المدمج (تصدير إكسيل منسق)
+# القسم الجديد: استيراد ومعالجة ملفات المدخلات بصيغة .xls القديمة
 # ---------------------------------------------------------
-if main_mode == "🧮 معادلة الجرد اليومي المدمج (الفصل والتصدير الفوري)":
-    st.subheader("🧮 معادلة الجرد اليومي المدمج (تثبيت الدفتري وتجميع الفعلي بدقة وتصدير إكسيل)")
-    st.caption("ارفع ملفات الجرد اليومي. النظام يثبت الكمية الدفترية مرة واحدة ويجمع الكميات الفعلية، مع أزرار تحميل إكسيل منسقة لكل تقرير.")
+if main_mode == "📥 استيراد ومعالجة ملفات المدخلات (.xls)":
+    st.subheader("📥 استيراد وتصدير ملفات المدخلات بصيغة Excel 97-2003 (.xls)")
+    st.caption("ارفع ملف المدخلات القديم، وسيقوم البرنامج بقراءته وتصديره بالصيغة المتوافقة تماماً مع برنامجك.")
+
+    inp_file = st.file_uploader("📁 ارفع ملف المدخلات هنا:", type=["xlsx", "xls", "csv"])
+    if inp_file is not None:
+        try:
+            if inp_file.name.endswith(".csv"):
+                df_inp = pd.read_csv(inp_file, encoding="utf-8-sig", header=None, dtype=str)
+            else:
+                df_inp = pd.read_excel(inp_file, header=None, dtype=str)
+
+            df_inp = df_inp.iloc[:, :2]
+            df_inp.columns = [0, 1]
+            df_inp[0] = df_inp[0].apply(format_code_as_text)
+            df_inp[1] = pd.to_numeric(df_inp[1], errors="coerce").fillna(0)
+
+            st.success("تم استيراد ملف المدخلات بنجاح تام!")
+            st.dataframe(df_inp, use_container_width=True, hide_index=False)
+
+            xls_bytes = convert_df_to_xls(df_inp)
+            st.download_button(
+                "📥 تحميل ملف المدخلات بصيغة Excel القديمة (.xls)",
+                xls_bytes,
+                "مدخلات_منسقة.xls",
+                "application/vnd.ms-excel"
+            )
+        except Exception as e:
+            st.error(f"خطأ في قراءة الملف: {e}")
+    else:
+        st.info("👈 يرجى رفع ملف المدخلات لعرضه وتصديره بالصيغة المطلوبة.")
+
+# ---------------------------------------------------------
+# القسم الأول: معادلة الجرد اليومي المدمج (الفصل والتصدير بصيغة .xls)
+# ---------------------------------------------------------
+elif main_mode == "🧮 معادلة الجرد اليومي المدمج (الفصل والتصدير بصيغة .xls القديمة)":
+    st.subheader("🧮 معادلة الجرد اليومي المدمج (تصدير برمز المادة والكمية بصيغة .xls القديمة)")
+    st.caption("ارفع ملفات الجرد اليومي. يقوم النظام بدمجها وتصدير تقارير الزيادة والفقد بصيغة Excel 97-2003 (.xls) لتقرأ في برنامجك مباشرة.")
 
     eq_files = st.file_uploader(
         "📁 ارفع ملفات الجرد اليومي دفعة واحدة:", 
@@ -97,11 +151,17 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (الف�
                 if any(k in cs for k in ["actualqty", "فعلي"]): c_act = col
 
             combined_eq["كود الصنف"] = combined_eq[c_code].apply(format_code_as_text)
-            combined_eq["اسم الصنف"] = combined_eq[c_name].astype(str).str.strip()
+            
+            def get_clean_name(row):
+                c = row["كود الصنف"]
+                if c in master_code_dict:
+                    return master_code_dict[c]
+                return str(row[c_name]).strip()
+
+            combined_eq["اسم الصنف"] = combined_eq.apply(get_clean_name, axis=1)
             combined_eq["الكمية الدفترية"] = pd.to_numeric(combined_eq[c_sys], errors="coerce").fillna(0)
             combined_eq["الكمية الفعلية"] = pd.to_numeric(combined_eq[c_act], errors="coerce").fillna(0)
 
-            # تجميع بدون تكرار للدفترية وجمع الفعلية
             eq_agg = combined_eq.groupby(["كود الصنف", "اسم الصنف"], as_index=False).agg({
                 "الكمية الدفترية": "first",
                 "الكمية الفعلية": "sum"
@@ -111,60 +171,61 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (الف�
             eq_agg["كمية الزيادة"] = eq_agg["الفرق"].apply(lambda x: x if x > 0 else 0)
             eq_agg["كمية الفقد (العجز)"] = eq_agg["الفرق"].apply(lambda x: -x if x < 0 else 0)
 
-            st.success(f"تم دمج وتحليل عدد {len(eq_files)} ملفات بنجاح واستخراج التقارير جاهزة للتحميل كإكسيل!")
+            st.success(f"تم دمج وتحليل عدد {len(eq_files)} ملفات بنجاح!")
 
             eq_tab1, eq_tab2, eq_tab3, eq_tab4, eq_tab5 = st.tabs([
                 "📋 إجمالي الجرد المدمج", 
                 "➕ أصناف الزيادة", 
                 "📉 أصناف الفقد (العجز)", 
-                "📌 رمز المادة + كمية الزيادة فقط", 
-                "📌 رمز المادة + كمية الفقد فقط"
+                "📌 رمز المادة + كمية الزيادة (.xls)", 
+                "📌 رمز المادة + كمية الفقد (.xls)"
             ])
 
             with eq_tab1:
                 st.subheader("📋 إجمالي الجرد المدمج")
                 st.dataframe(eq_agg, use_container_width=True, hide_index=True)
-                excel_data = convert_df_to_excel(eq_agg)
-                st.download_button("📥 تحميل إجمالي الجرد المدمج (Excel)", excel_data, "اجمالي_الجرد_المدمج.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                df_out1 = eq_agg[["كود الصنف", "الفرق"]].copy()
+                xls_data = convert_df_to_xls(df_out1)
+                st.download_button("📥 تحميل إجمالي الجرد (.xls)", xls_data, "اجمالي_الجرد.xls", "application/vnd.ms-excel")
 
             with eq_tab2:
                 st.subheader("➕ الأصناف التي بها زيادة")
                 df_surplus = eq_agg[eq_agg["كمية الزيادة"] > 0].copy()
                 st.dataframe(df_surplus, use_container_width=True, hide_index=True)
                 if not df_surplus.empty:
-                    excel_data = convert_df_to_excel(df_surplus)
-                    st.download_button("📥 تحميل تقرير الزيادة (Excel)", excel_data, "اصناف_الزيادة.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    df_out2 = df_surplus[["كود الصنف", "كمية الزيادة"]].copy()
+                    xls_data = convert_df_to_xls(df_out2)
+                    st.download_button("📥 تحميل تقرير الزيادة (.xls)", xls_data, "اصناف_الزيادة.xls", "application/vnd.ms-excel")
 
             with eq_tab3:
                 st.subheader("📉 الأصناف التي بها فقد أو عجز")
                 df_short = eq_agg[eq_agg["كمية الفقد (العجز)"] > 0].copy()
                 st.dataframe(df_short, use_container_width=True, hide_index=True)
                 if not df_short.empty:
-                    excel_data = convert_df_to_excel(df_short)
-                    st.download_button("📥 تحميل تقرير الفقد (Excel)", excel_data, "اصناف_الفقد.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    df_out3 = df_short[["كود الصنف", "كمية الفقد (العجز)"]].copy()
+                    xls_data = convert_df_to_xls(df_out3)
+                    st.download_button("📥 تحميل تقرير الفقد (.xls)", xls_data, "اصناف_الفقد.xls", "application/vnd.ms-excel")
 
             with eq_tab4:
-                st.subheader("📌 رمز المادة وكمية الزيادة فقط")
+                st.subheader("📌 رمز المادة وكمية الزيادة فقط (.xls)")
                 df_code_surplus = eq_agg[eq_agg["كمية الزيادة"] > 0][["كود الصنف", "كمية الزيادة"]].copy()
-                df_code_surplus.columns = ["رمز المادة", "كمية الزيادة"]
                 st.dataframe(df_code_surplus, use_container_width=True, hide_index=True)
                 if not df_code_surplus.empty:
-                    excel_data = convert_df_to_excel(df_code_surplus)
-                    st.download_button("📥 تحميل رمز المادة وكمية الزيادة (Excel)", excel_data, "رمز_المادة_وكمية_الزيادة.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    xls_data = convert_df_to_xls(df_code_surplus)
+                    st.download_button("📥 تحميل رمز المادة وكمية الزيادة (.xls)", xls_data, "رمز_المادة_وكمية_الزيادة.xls", "application/vnd.ms-excel")
 
             with eq_tab5:
-                st.subheader("📌 رمز المادة وكمية الفقد فقط")
+                st.subheader("📌 رمز المادة وكمية الفقد فقط (.xls)")
                 df_code_short = eq_agg[eq_agg["كمية الفقد (العجز)"] > 0][["كود الصنف", "كمية الفقد (العجز)"]].copy()
-                df_code_short.columns = ["رمز المادة", "كمية الفقد"]
                 st.dataframe(df_code_short, use_container_width=True, hide_index=True)
                 if not df_code_short.empty:
-                    excel_data = convert_df_to_excel(df_code_short)
-                    st.download_button("📥 تحميل رمز المادة وكمية الفقد (Excel)", excel_data, "رمز_المادة_وكمية_الفقد.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    xls_data = convert_df_to_xls(df_code_short)
+                    st.download_button("📥 تحميل رمز المادة وكمية الفقد (.xls)", xls_data, "رمز_المادة_وكمية_الفقد.xls", "application/vnd.ms-excel")
 
         except Exception as e:
             st.error(f"حدث خطأ أثناء معالجة معادلة الجرد: {e}")
     else:
-        st.info("👈 ارفع ملفات الجرد اليومي في زرار الرفع أعلاه لتطبيق معادلة الجرد المدمج بدقة.")
+        st.info("👈 تأكد من وجود ملف `رمز المادة.xlsx` في نفس المجلد، ثم ارفع ملفات الجرد اليومي في زرار الرفع أعلاه.")
 
 # ---------------------------------------------------------
 # باقي الأقسام
@@ -193,7 +254,7 @@ elif main_mode == "✅ مهام ومجموعات جرد الأسبوع (حسب �
 
     progress_pct = (completed_count / total_tasks) * 100 if total_tasks > 0 else 0
     st.progress(progress_pct / 100)
-    st.write(f"نسبة الإنجاز: **{progress_pct:.1f}%**")
+    st.write(f`نسبة الإنجاز: **{progress_pct:.1f}%**`)
 
 elif main_mode == "📊 التقرير التنفيذي (شهر 9 وشهر 10)":
     st.subheader("📊 لوحة تحكم ومؤشرات أداء الجرد (سبتمبر وأكتوبر)")
