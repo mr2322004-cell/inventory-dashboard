@@ -24,7 +24,7 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المبسط: معادلة الجرد اليومي المدمج + تقرير الأسبوع (تصدير متوافق 100% مع النظام القديم)")
+st.caption("النظام المبسط: معادلة الجرد اليومي المدمج + تقرير الأسبوع")
 
 main_mode = st.sidebar.radio(
     "📂 الأقسام الرئيسية:",
@@ -47,11 +47,10 @@ def format_code_as_text(val):
         pass
     return val_str
 
-# دالة التصدير المتوافقة مع النظام القديم بدون أي أخطاء
+# دالة التصدير باستخدام openpyxl المتاح دائماً
 def convert_df_to_exact_xls(df_to_export):
     output = io.BytesIO()
-    # استخدام محرك xlsxwriter لتوليد ملف إكسيل متوافق ونظيف
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df_to_export.to_excel(writer, index=False, header=False, sheet_name='Sheet1')
     return output.getvalue()
 
@@ -60,7 +59,7 @@ def convert_df_to_exact_xls(df_to_export):
 # ---------------------------------------------------------
 if main_mode == "🧮 معادلة الجرد اليومي المدمج (تصدير .xls متوافق)":
     st.subheader("🧮 معادلة الجرد اليومي المدمج (استخراج رمز المادة الرسمي وتصدير .xls)")
-    st.caption("ارفع أولاً ملف (رمز المادة الأساسي)، ثم ارفع ملفات الجرد اليومي لدمجها واستخراج الرموز وحفظ الملف بالصيغة المقبولة تماماً.")
+    st.caption("ارفع أولاً ملف (رمز المادة الأساسي)، ثم ارفع ملفات الجرد اليومي لدمجها واستخراج الرموز وحفظ الملف بالصيغة المقبولة.")
 
     master_file = st.file_uploader("📁 1. ارفع الملف الأساسي (رمز المادة.xlsx):", type=["xlsx", "xls"])
     
