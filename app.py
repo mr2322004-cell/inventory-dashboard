@@ -24,7 +24,7 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المبسط: معادلة الجرد اليومي المدمج + تقرير الأسبوع فقط")
+st.caption("النظام المبسط: معادلة الجرد اليومي المدمج + تقرير الأسبوع")
 
 # القائمة الجانبية المقتصرة على المطلوب فقط
 main_mode = st.sidebar.radio(
@@ -54,38 +54,39 @@ def convert_df_to_xls(df_to_export):
         df_to_export.to_excel(writer, index=False, header=False, sheet_name='Sheet1')
     return output.getvalue()
 
-@st.cache_data
-def load_master_codes():
-    try:
-        df_m = pd.read_excel("رمز المادة.xlsx")
-        name_to_code = {}
-        for val in df_m.iloc[:, 0].dropna():
-            val_str = str(val).strip()
-            if '-' in val_str:
-                p = val_str.split('-', 1)
-                code_val = format_code_as_text(p[0])
-                name_val = p[1].strip().lower()
-                name_to_code[name_val] = code_val
-        return name_to_code
-    except:
-        return {}
-
-master_name_to_code = load_master_codes()
-
 # ---------------------------------------------------------
-# 1. معادلة الجرد اليومي المدمج
+# 1. معادلة الجرد اليومي المدمج (مع رفع الملف الأساسي وملفات الجرد)
 # ---------------------------------------------------------
 if main_mode == "🧮 معادلة الجرد اليومي المدمج (تصدير .xls)":
     st.subheader("🧮 معادلة الجرد اليومي المدمج (استخراج رمز المادة الرسمي وتصدير .xls)")
-    st.caption("ارفع ملفات الجرد اليومي. يقوم النظام بمطابقة الأصناف مع ملف (رمز المادة.xlsx) لاستخراج رمز المادة الحقيقي وتصدير التقارير بصيغة .xls.")
+    st.caption("ارفع أولاً ملف (رمز المادة الأساسي)، ثم ارفع ملفات الجرد اليومي لدمجها واستخراج الرموز الحقيقية بدقة.")
 
+    # زرار رفع الملف الأساسي لرمز المادة
+    master_file = st.file_uploader("📁 1. ارفع الملف الأساسي (رمز المادة.xlsx):", type=["xlsx", "xls"])
+    
+    # زرار رفع ملفات الجرد اليومي
     eq_files = st.file_uploader(
-        "📁 ارفع ملفات الجرد اليومي دفعة واحدة:", 
+        "📁 2. ارفع ملفات الجرد اليومي دفعة واحدة:", 
         type=["xlsx", "xls", "csv"], 
         accept_multiple_files=True
     )
 
-    if eq_files:
+    master_name_to_code = {}
+    if master_file is not None:
+        try:
+            df_m = pd.read_excel(master_file)
+            for val in df_m.iloc[:, 0].dropna():
+                val_str = str(val).strip()
+                if '-' in val_str:
+                    p = val_str.split('-', 1)
+                    code_val = format_code_as_text(p[0])
+                    name_val = p[1].strip().lower()
+                    master_name_to_code[name_val] = code_val
+            st.success("تم قراءة الملف الأساسي لرموز المواد بنجاح!")
+        except Exception as e:
+            st.error(f"خطأ في قراءة الملف الأساسي: {e}")
+
+    if eq_files and master_file:
         try:
             eq_dfs = []
             for ef in eq_files:
@@ -130,7 +131,7 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (تصد�
             eq_agg["كمية الزيادة"] = eq_agg["الفرق"].apply(lambda x: x if x > 0 else 0)
             eq_agg["كمية الفقد (العجز)"] = eq_agg["الفرق"].apply(lambda x: -x if x < 0 else 0)
 
-            st.success(f"تم دمج وتحليل عدد {len(eq_files)} ملفات بنجاح واستخراج رموز المواد الرسمية!")
+            st.success(f"تم دمج وتحليل عدد {len(eq_files)} ملفات بنجاح واستخراج رموز المواد الرسمية من الملف الأساسي!")
 
             eq_tab1, eq_tab2, eq_tab3, eq_tab4, eq_tab5 = st.tabs([
                 "📋 إجمالي الجرد المدمج", 
@@ -184,7 +185,7 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (تصد�
         except Exception as e:
             st.error(f"حدث خطأ أثناء معالجة معادلة الجرد: {e}")
     else:
-        st.info("👈 تأكد من وجود ملف `رمز المادة.xlsx` في نفس المجلد، ثم ارفع ملفات الجرد اليومي في زر الرفع أعلاه.")
+        st.info("👈 يرجى رفع الملف الأساسي (رمز المادة) أولاً، ثم رفع ملفات الجرد اليومي لتظهر النتائج فوراً.")
 
 # ---------------------------------------------------------
 # 2. تقرير ومجموعات جرد الأسبوع
