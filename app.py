@@ -24,7 +24,7 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المتكامل: تحويل الأكواد لنص كامل 100% + معادلة الجرد اليومي المدمج + تقارير الشهور + تحليل الفاقد + الجرد السريع")
+st.caption("النظام المتكامل: معادلة الجرد اليومي المدمج + تقارير الشهور + تحليل الفاقد + الجرد السريع")
 
 main_mode = st.sidebar.radio(
     "📂 اختر القسم المطلوب:",
@@ -39,15 +39,13 @@ main_mode = st.sidebar.radio(
     ]
 )
 
-# دالة ذكية لتحويل الأكواد لنص صريح دون تحويلها لرموز علمية E+12
+# دالة لتنسيق الأكواد كنصوص كاملة لمنع الرموز العلمية
 def format_code_as_text(val):
     if pd.isna(val):
         return ""
-    # تحويل لسطر نصي مع إزالة البوينت صفر لو موجودة من الإكسيل
     val_str = str(val).strip()
     if val_str.endswith(".0"):
         val_str = val_str[:-2]
-    # لو كان رقم علمي بصيغة e/E تحويله لرقم صحيح نصي
     try:
         if "e" in val_str.lower():
             val_str = f"{float(val_str):.0f}"
@@ -55,29 +53,19 @@ def format_code_as_text(val):
         pass
     return val_str
 
-# دالة لتصدير الإكسيل مع الحفاظ على الأكواد كنصوص صريحة 100%
-def to_excel_with_text_codes(df, code_cols=["كود الصنف", "رمز المادة"]):
+# دالة تصدير آمنة إكسيل/CSV بدون أخطاء
+def convert_df_to_excel(df):
     output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Sheet1')
-        workbook = writer.book
-        worksheet = writer.sheets['Sheet1']
-        
-        text_format = workbook.add_format({'num_format': '@'})
-        
-        for col_idx, col_name in enumerate(df.columns):
-            if col_name in code_cols:
-                worksheet.set_column(col_idx, col_idx, 20, text_format)
-                for row_idx, value in enumerate(df[col_name]):
-                    worksheet.write_string(row_idx + 1, col_idx, str(value), text_format)
     return output.getvalue()
 
 # ---------------------------------------------------------
-# القسم الأول: معادلة الجرد اليومي المدمج (معالجة الأكواد كنص)
+# القسم الأول: معادلة الجرد اليومي المدمج
 # ---------------------------------------------------------
 if main_mode == "🧮 معادلة الجرد اليومي المدمج (الفصل والتصدير الفوري)":
-    st.subheader("🧮 معادلة الجرد اليومي المدمج (تصدير كود المادة كـ نص كامل)")
-    st.caption("ارفع جميع ملفات الجرد اليومي. يتم دمجها وتجميع الكميات، وتصدير الأكواد كنص صريح يفتح في الإكسيل بدون Scientific Notation (E+12).")
+    st.subheader("🧮 معادلة الجرد اليومي المدمج (بدون تكرار وفصل الزيادة والعجز)")
+    st.caption("ارفع جميع ملفات الجرد اليومي هنا. يقوم النظام بدمجها، عدم تكرار الأصناف، حساب الفروقات، وفصل تقارير الزيادة والعجز.")
 
     eq_files = st.file_uploader(
         "📁 ارفع ملفات الجرد اليومي دفعة واحدة:", 
@@ -90,10 +78,9 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (الف�
             eq_dfs = []
             for ef in eq_files:
                 if ef.name.endswith(".csv"):
-                    df_temp = pd.read_csv(ef, encoding="utf-8-sig", dtype=str)
+                    eq_dfs.append(pd.read_csv(ef, encoding="utf-8-sig", dtype=str))
                 else:
-                    df_temp = pd.read_excel(ef, dtype=str)
-                eq_dfs.append(df_temp)
+                    eq_dfs.append(pd.read_excel(ef, dtype=str))
 
             combined_eq = pd.concat(eq_dfs, ignore_index=True)
 
@@ -126,7 +113,7 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (الف�
             eq_agg["كمية الزيادة"] = eq_agg.apply(lambda r: (r["الكمية الفعلية"] - r["الكمية الدفترية"]) if r["الكمية الفعلية"] > r["الكمية الدفترية"] else 0, axis=1)
             eq_agg["كمية الفقد (العجز)"] = eq_agg.apply(lambda r: (r["الكمية الدفترية"] - r["الكمية الفعلية"]) if r["الكمية الدفترية"] > r["الكمية الفعلية"] else 0, axis=1)
 
-            st.success(f"تم دمج عدد {len(eq_files)} ملفات بنجاح وحفظ رموز المواد كنص كامل!")
+            st.success(f"تم دمج عدد {len(eq_files)} ملفات بنجاح واستخراج الناتج بدون تكرار!")
 
             eq_tab1, eq_tab2, eq_tab3, eq_tab4, eq_tab5 = st.tabs([
                 "📋 إجمالي الجرد المدمج", 
@@ -137,26 +124,26 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (الف�
             ])
 
             with eq_tab1:
-                st.subheader("📋 إجمالي الجرد المدمج")
+                st.subheader("📋 إجمالي الجرد المدمج (كل الأصناف فوق بعض بدون تكرار)")
                 st.dataframe(eq_agg, use_container_width=True, hide_index=True)
-                excel_bytes = to_excel_with_text_codes(eq_agg, code_cols=["كود الصنف"])
-                st.download_button("📥 تحميل إجمالي الجرد المدمج (Excel نصي)", excel_bytes, "اجمالي_الجرد_المدمج.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                excel_data = convert_df_to_excel(eq_agg)
+                st.download_button("📥 تحميل إجمالي الجرد المدمج (Excel)", excel_data, "اجمالي_الجرد_المدمج.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
             with eq_tab2:
                 st.subheader("➕ الأصناف التي بها زيادة")
                 df_surplus = eq_agg[eq_agg["كمية الزيادة"] > 0].copy()
                 st.dataframe(df_surplus, use_container_width=True, hide_index=True)
                 if not df_surplus.empty:
-                    excel_surp = to_excel_with_text_codes(df_surplus, code_cols=["كود الصنف"])
-                    st.download_button("📥 تحميل تقرير الزيادة (Excel نصي)", excel_surp, "اصناف_الزيادة.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    excel_data = convert_df_to_excel(df_surplus)
+                    st.download_button("📥 تحميل تقرير الزيادة (Excel)", excel_data, "اصناف_الزيادة.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
             with eq_tab3:
                 st.subheader("📉 الأصناف التي بها فقد أو عجز")
                 df_short = eq_agg[eq_agg["كمية الفقد (العجز)"] > 0].copy()
                 st.dataframe(df_short, use_container_width=True, hide_index=True)
                 if not df_short.empty:
-                    excel_short = to_excel_with_text_codes(df_short, code_cols=["كود الصنف"])
-                    st.download_button("📥 تحميل تقرير الفقد (Excel نصي)", excel_short, "اصناف_الفقد.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    excel_data = convert_df_to_excel(df_short)
+                    st.download_button("📥 تحميل تقرير الفقد (Excel)", excel_data, "اصناف_الفقد.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
             with eq_tab4:
                 st.subheader("📌 رمز المادة وكمية الزيادة فقط")
@@ -164,8 +151,8 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (الف�
                 df_code_surplus.columns = ["رمز المادة", "كمية الزيادة"]
                 st.dataframe(df_code_surplus, use_container_width=True, hide_index=True)
                 if not df_code_surplus.empty:
-                    excel_cs = to_excel_with_text_codes(df_code_surplus, code_cols=["رمز المادة"])
-                    st.download_button("📥 تحميل رمز المادة وكمية الزيادة (Excel نصي)", excel_cs, "رمز_المادة_وكمية_الزيادة.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    excel_data = convert_df_to_excel(df_code_surplus)
+                    st.download_button("📥 تحميل رمز المادة وكمية الزيادة (Excel)", excel_data, "رمز_المادة_وكمية_الزيادة.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
             with eq_tab5:
                 st.subheader("📌 رمز المادة وكمية الفقد فقط")
@@ -173,8 +160,8 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (الف�
                 df_code_short.columns = ["رمز المادة", "كمية الفقد"]
                 st.dataframe(df_code_short, use_container_width=True, hide_index=True)
                 if not df_code_short.empty:
-                    excel_csh = to_excel_with_text_codes(df_code_short, code_cols=["رمز المادة"])
-                    st.download_button("📥 تحميل رمز المادة وكمية الفقد (Excel نصي)", excel_csh, "رمز_المادة_وكمية_الفقد.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    excel_data = convert_df_to_excel(df_code_short)
+                    st.download_button("📥 تحميل رمز المادة وكمية الفقد (Excel)", excel_data, "رمز_المادة_وكمية_الفقد.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
         except Exception as e:
             st.error(f"حدث خطأ أثناء معالجة معادلة الجرد: {e}")
@@ -188,7 +175,6 @@ elif main_mode == "✅ مهام ومجموعات جرد الأسبوع (حسب �
     st.subheader("✅ جدول ومجموعات جرد الأسبوع (متابعة محمد قطان)")
     today = datetime.date.today()
     current_week_number = today.isocalendar()[1]
-
     tasks_schedule = {
         "🧊 السبت: جرد الثلاجة (الجبن، اللانشون، الألبان، الخضار، الصوصات، زبدة، سمنة)": False,
         "🗓️ الأحد والأربعاء (الدفعة الأولى): مناديل، حفاضات، مواد التنظيف، غسيل الملابس والصحون، عناية شخصية": False,
@@ -197,14 +183,12 @@ elif main_mode == "✅ مهام ومجموعات جرد الأسبوع (حسب �
         "🗓️ الأربعاء والسبت (الدفعة الثانية): أخري استخدام مرة واحدة، بطاريات، منعمات الأقمشة، معطر جو، مبيدات حشرية": False,
         "🗓️ الخميس: المتبقيات والأقسام الإضافية (مشروم، ورق عنب، مخلل، صلصة، ضيافة العيد)": False,
     }
-
     if 'todo_week_num_v3' not in st.session_state or st.session_state['todo_week_num_v3'] != current_week_number:
         st.session_state['todo_week_num_v3'] = current_week_number
         st.session_state['tasks_state_v3'] = tasks_schedule
 
     completed_count = sum(1 for v in st.session_state['tasks_state_v3'].values() if v)
     total_tasks = len(st.session_state['tasks_state_v3'])
-
     for task_name in list(st.session_state['tasks_state_v3'].keys()):
         is_checked = st.checkbox(task_name, value=st.session_state['tasks_state_v3'][task_name], key=f"task_v3_{task_name}")
         st.session_state['tasks_state_v3'][task_name] = is_checked
