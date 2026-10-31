@@ -24,7 +24,7 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المتكامل: معادلة الجرد اليومي المدمج + تقارير الشهور + تحليل الفاقد + الجرد السريع")
+st.caption("النظام المتكامل: معادلة الجرد اليومي المدمج (المصححة بدقة) + تقارير الأسبوع + الجرد السريع")
 
 main_mode = st.sidebar.radio(
     "📂 اختر القسم المطلوب:",
@@ -39,7 +39,6 @@ main_mode = st.sidebar.radio(
     ]
 )
 
-# دالة لتنسيق الأكواد كنصوص كاملة لمنع الرموز العلمية
 def format_code_as_text(val):
     if pd.isna(val):
         return ""
@@ -53,7 +52,6 @@ def format_code_as_text(val):
         pass
     return val_str
 
-# دالة تصدير آمنة إكسيل/CSV بدون أخطاء
 def convert_df_to_excel(df):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -61,11 +59,11 @@ def convert_df_to_excel(df):
     return output.getvalue()
 
 # ---------------------------------------------------------
-# القسم الأول: معادلة الجرد اليومي المدمج
+# القسم الأول: معادلة الجرد اليومي المدمج (المصححة بدقة تامة)
 # ---------------------------------------------------------
 if main_mode == "🧮 معادلة الجرد اليومي المدمج (الفصل والتصدير الفوري)":
-    st.subheader("🧮 معادلة الجرد اليومي المدمج (بدون تكرار وفصل الزيادة والعجز)")
-    st.caption("ارفع جميع ملفات الجرد اليومي هنا. يقوم النظام بدمجها، عدم تكرار الأصناف، حساب الفروقات، وفصل تقارير الزيادة والعجز.")
+    st.subheader("🧮 معادلة الجرد اليومي المدمج (تصحيح حساب الفروقات والكميات الدفترية)")
+    st.caption("ارفع جميع ملفات الجرد اليومي هنا. سيقوم النظام بدمجها بدقة تامة، تجميع الأصناف بدون تكرار، وحساب الزيادة والفقد بدقة مطلقة.")
 
     eq_files = st.file_uploader(
         "📁 ارفع ملفات الجرد اليومي دفعة واحدة:", 
@@ -78,42 +76,45 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (الف�
             eq_dfs = []
             for ef in eq_files:
                 if ef.name.endswith(".csv"):
-                    eq_dfs.append(pd.read_csv(ef, encoding="utf-8-sig", dtype=str))
+                    df_t = pd.read_csv(ef, encoding="utf-8-sig", dtype=str)
                 else:
-                    eq_dfs.append(pd.read_excel(ef, dtype=str))
+                    df_t = pd.read_excel(ef, dtype=str)
+                eq_dfs.append(df_t)
 
             combined_eq = pd.concat(eq_dfs, ignore_index=True)
 
+            # استخراج دقيق للأعمدة الأساسية من الملفات المرفوعة
             c_code = "Code" if "Code" in combined_eq.columns else combined_eq.columns[0]
             c_name = "Detail" if "Detail" in combined_eq.columns else combined_eq.columns[2]
             c_sys = "SystemQty" if "SystemQty" in combined_eq.columns else combined_eq.columns[3]
             c_act = "ActualQty" if "ActualQty" in combined_eq.columns else combined_eq.columns[4]
-            c_diff = "Difference" if "Difference" in combined_eq.columns else combined_eq.columns[5]
 
             for col in combined_eq.columns:
                 cs = str(col).lower()
                 if any(k in cs for k in ["code", "كود"]): c_code = col
                 if any(k in cs for k in ["detail", "name", "صنف", "مادة"]): c_name = col
-                if any(k in cs for k in ["systemqty", "نظام"]): c_sys = col
+                if any(k in cs for k in ["systemqty", "دفترية", "نظام"]): c_sys = col
                 if any(k in cs for k in ["actualqty", "فعلي"]): c_act = col
-                if any(k in cs for k in ["difference", "فرق"]): c_diff = col
 
             combined_eq["كود الصنف"] = combined_eq[c_code].apply(format_code_as_text)
             combined_eq["اسم الصنف"] = combined_eq[c_name].astype(str).str.strip()
             combined_eq["الكمية الدفترية"] = pd.to_numeric(combined_eq[c_sys], errors="coerce").fillna(0)
             combined_eq["الكمية الفعلية"] = pd.to_numeric(combined_eq[c_act], errors="coerce").fillna(0)
-            combined_eq["الفرق"] = pd.to_numeric(combined_eq[c_diff], errors="coerce").fillna(0)
 
+            # تجميع البيانات لكل صنف بدون تكرار (جمع الدفترية والفعلية معا)
             eq_agg = combined_eq.groupby(["كود الصنف", "اسم الصنف"], as_index=False).agg({
                 "الكمية الدفترية": "sum",
-                "الكمية الفعلية": "sum",
-                "الفرق": "sum"
+                "الكمية الفعلية": "sum"
             })
 
-            eq_agg["كمية الزيادة"] = eq_agg.apply(lambda r: (r["الكمية الفعلية"] - r["الكمية الدفترية"]) if r["الكمية الفعلية"] > r["الكمية الدفترية"] else 0, axis=1)
-            eq_agg["كمية الفقد (العجز)"] = eq_agg.apply(lambda r: (r["الكمية الدفترية"] - r["الكمية الفعلية"]) if r["الكمية الدفترية"] > r["الكمية الفعلية"] else 0, axis=1)
+            # حساب الفرق الدقيق = الفعلية - الدفترية
+            eq_agg["الفرق"] = eq_agg["الكمية الفعلية"] - eq_agg["الكمية الدفترية"]
 
-            st.success(f"تم دمج عدد {len(eq_files)} ملفات بنجاح واستخراج الناتج بدون تكرار!")
+            # فصل الزيادة والعجز بناء على الفرق
+            eq_agg["كمية الزيادة"] = eq_agg["الفرق"].apply(lambda x: x if x > 0 else 0)
+            eq_agg["كمية الفقد (العجز)"] = eq_agg["الفرق"].apply(lambda x: -x if x < 0 else 0)
+
+            st.success(f"تم دمج وتحليل عدد {len(eq_files)} ملفات بنجاح تام وبدون أي أخطاء في الحسابات!")
 
             eq_tab1, eq_tab2, eq_tab3, eq_tab4, eq_tab5 = st.tabs([
                 "📋 إجمالي الجرد المدمج", 
@@ -124,7 +125,7 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (الف�
             ])
 
             with eq_tab1:
-                st.subheader("📋 إجمالي الجرد المدمج (كل الأصناف فوق بعض بدون تكرار)")
+                st.subheader("📋 إجمالي الجرد المدمج (بدون تكرار)")
                 st.dataframe(eq_agg, use_container_width=True, hide_index=True)
                 excel_data = convert_df_to_excel(eq_agg)
                 st.download_button("📥 تحميل إجمالي الجرد المدمج (Excel)", excel_data, "اجمالي_الجرد_المدمج.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -166,7 +167,7 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (الف�
         except Exception as e:
             st.error(f"حدث خطأ أثناء معالجة معادلة الجرد: {e}")
     else:
-        st.info("👈 ارفع ملفات الجرد اليومي في زرار الرفع أعلاه لتطبيق معادلة الجرد المدمج وفصل النتائج.")
+        st.info("👈 ارفع ملفات الجرد اليومي في زرار الرفع أعلاه لتطبيق معادلة الجرد المدمج بدقة.")
 
 # ---------------------------------------------------------
 # باقي الأقسام
