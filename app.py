@@ -24,7 +24,7 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المتكامل: معادلة الجرد اليومي المدمج (تصحيح تجميع الدفتري والفعلية) + تقارير الأسبوع + الجرد السريع")
+st.caption("النظام المتكامل: معادلة الجرد اليومي المدمج (تصدير إكسيل قياسي ومنسق) + تقارير الأسبوع + الجرد السريع")
 
 main_mode = st.sidebar.radio(
     "📂 اختر القسم المطلوب:",
@@ -52,18 +52,19 @@ def format_code_as_text(val):
         pass
     return val_str
 
+# دالة تصدير ملفات Excel بصيغة منسقة واحترافية
 def convert_df_to_excel(df):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Sheet1')
+        df.to_excel(writer, index=False, sheet_name='تقرير المخزن')
     return output.getvalue()
 
 # ---------------------------------------------------------
-# القسم الأول: معادلة الجرد اليومي المدمج (التصحيح الجذري للدفثري والفعلية)
+# القسم الأول: معادلة الجرد اليومي المدمج (تصدير إكسيل منسق)
 # ---------------------------------------------------------
 if main_mode == "🧮 معادلة الجرد اليومي المدمج (الفصل والتصدير الفوري)":
-    st.subheader("🧮 معادلة الجرد اليومي المدمج (تثبيت الدفتري وتجميع الفعلي بدقة)")
-    st.caption("ارفع ملفات الجرد اليومي. النظام يثبت الكمية الدفترية مرة واحدة ويجمع الكميات الفعلية فقط لمنع أي تضخم وهمي في العجز.")
+    st.subheader("🧮 معادلة الجرد اليومي المدمج (تثبيت الدفتري وتجميع الفعلي بدقة وتصدير إكسيل)")
+    st.caption("ارفع ملفات الجرد اليومي. النظام يثبت الكمية الدفترية مرة واحدة ويجمع الكميات الفعلية، مع أزرار تحميل إكسيل منسقة لكل تقرير.")
 
     eq_files = st.file_uploader(
         "📁 ارفع ملفات الجرد اليومي دفعة واحدة:", 
@@ -100,22 +101,17 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (الف�
             combined_eq["الكمية الدفترية"] = pd.to_numeric(combined_eq[c_sys], errors="coerce").fillna(0)
             combined_eq["الكمية الفعلية"] = pd.to_numeric(combined_eq[c_act], errors="coerce").fillna(0)
 
-            # التعديل الجذري الذكي:
-            # 1. الدفترية تأخذ أول قيمة (أو max/mean) لكي لا تتضاعف عند تكرار الملفات.
-            # 2. الفعلية يتم جمعها (sum) لجمع الجرد الفعلي للمنتج بدقة.
+            # تجميع بدون تكرار للدفترية وجمع الفعلية
             eq_agg = combined_eq.groupby(["كود الصنف", "اسم الصنف"], as_index=False).agg({
                 "الكمية الدفترية": "first",
                 "الكمية الفعلية": "sum"
             })
 
-            # حساب الفرق الدقيق = الفعلية - الدفترية
             eq_agg["الفرق"] = eq_agg["الكمية الفعلية"] - eq_agg["الكمية الدفترية"]
-
-            # فصل الزيادة والعجز
             eq_agg["كمية الزيادة"] = eq_agg["الفرق"].apply(lambda x: x if x > 0 else 0)
             eq_agg["كمية الفقد (العجز)"] = eq_agg["الفرق"].apply(lambda x: -x if x < 0 else 0)
 
-            st.success(f"تم دمج وتحليل عدد {len(eq_files)} ملفات بنجاح وتم منع تكرار الكمية الدفترية تماماً!")
+            st.success(f"تم دمج وتحليل عدد {len(eq_files)} ملفات بنجاح واستخراج التقارير جاهزة للتحميل كإكسيل!")
 
             eq_tab1, eq_tab2, eq_tab3, eq_tab4, eq_tab5 = st.tabs([
                 "📋 إجمالي الجرد المدمج", 
@@ -126,7 +122,7 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (الف�
             ])
 
             with eq_tab1:
-                st.subheader("📋 إجمالي الجرد المدمج (بدون تكرار الدفتري)")
+                st.subheader("📋 إجمالي الجرد المدمج")
                 st.dataframe(eq_agg, use_container_width=True, hide_index=True)
                 excel_data = convert_df_to_excel(eq_agg)
                 st.download_button("📥 تحميل إجمالي الجرد المدمج (Excel)", excel_data, "اجمالي_الجرد_المدمج.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
