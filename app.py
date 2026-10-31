@@ -24,13 +24,12 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المبسط: معادلة الجرد اليومي المدمج + تقرير الأسبوع (التصدير متوافق 100% مع البرنامج القديم)")
+st.caption("النظام المبسط: معادلة الجرد اليومي المدمج + تقرير الأسبوع (تصدير متوافق 100% مع النظام القديم)")
 
-# القائمة الجانبية المقتصرة على المطلوب فقط
 main_mode = st.sidebar.radio(
     "📂 الأقسام الرئيسية:",
     [
-        "🧮 معادلة الجرد اليومي المدمج (تصدير متوافق)",
+        "🧮 معادلة الجرد اليومي المدمج (تصدير .xls متوافق)",
         "✅ تقرير ومجموعات جرد الأسبوع"
     ]
 )
@@ -48,23 +47,23 @@ def format_code_as_text(val):
         pass
     return val_str
 
-# دالة تصدير متوافقة تماماً مع نظام الإكسيل القديم وبرنامج المخازن (Tab-separated)
-def convert_df_to_compatible_xls(df_to_export):
-    # تحويل البيانات إلى نص مفصول بعلامة تاب (Tab) بدون عناوين وبدون إندكس لتتوافق تماماً مع النظام القديم
-    tsv_data = df_to_export.to_csv(index=False, header=False, sep='\t', encoding='utf-16')
-    return tsv_data.encode('utf-16')
+# دالة التصدير المتوافقة مع النظام القديم بدون أي أخطاء
+def convert_df_to_exact_xls(df_to_export):
+    output = io.BytesIO()
+    # استخدام محرك xlsxwriter لتوليد ملف إكسيل متوافق ونظيف
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df_to_export.to_excel(writer, index=False, header=False, sheet_name='Sheet1')
+    return output.getvalue()
 
 # ---------------------------------------------------------
-# 1. معادلة الجرد اليومي المدمج (مع رفع الملف الأساسي وملفات الجرد)
+# 1. معادلة الجرد اليومي المدمج
 # ---------------------------------------------------------
-if main_mode == "🧮 معادلة الجرد اليومي المدمج (تصدير متوافق)":
-    st.subheader("🧮 معادلة الجرد اليومي المدمج (استخراج رمز المادة الرسمي وتصدير متوافق)")
-    st.caption("ارفع أولاً ملف (رمز المادة الأساسي)، ثم ارفع ملفات الجرد اليومي لدمجها واستخراج الرموز وحفظ الملف بالصيغة المقبولة في برنامجك.")
+if main_mode == "🧮 معادلة الجرد اليومي المدمج (تصدير .xls متوافق)":
+    st.subheader("🧮 معادلة الجرد اليومي المدمج (استخراج رمز المادة الرسمي وتصدير .xls)")
+    st.caption("ارفع أولاً ملف (رمز المادة الأساسي)، ثم ارفع ملفات الجرد اليومي لدمجها واستخراج الرموز وحفظ الملف بالصيغة المقبولة تماماً.")
 
-    # زرار رفع الملف الأساسي لرمز المادة
     master_file = st.file_uploader("📁 1. ارفع الملف الأساسي (رمز المادة.xlsx):", type=["xlsx", "xls"])
     
-    # زرار رفع ملفات الجرد اليومي
     eq_files = st.file_uploader(
         "📁 2. ارفع ملفات الجرد اليومي دفعة واحدة:", 
         type=["xlsx", "xls", "csv"], 
@@ -145,7 +144,7 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (تصد�
                 st.subheader("📋 إجمالي الجرد المدمج")
                 st.dataframe(eq_agg, use_container_width=True, hide_index=True)
                 df_out1 = eq_agg[["رمز المادة الرسمي", "الفرق"]].copy()
-                xls_data = convert_df_to_compatible_xls(df_out1)
+                xls_data = convert_df_to_exact_xls(df_out1)
                 st.download_button("📥 تحميل إجمالي الجرد (.xls)", xls_data, "اجمالي_الجرد.xls", "application/vnd.ms-excel")
 
             with eq_tab2:
@@ -154,7 +153,7 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (تصد�
                 st.dataframe(df_surplus, use_container_width=True, hide_index=True)
                 if not df_surplus.empty:
                     df_out2 = df_surplus[["رمز المادة الرسمي", "كمية الزيادة"]].copy()
-                    xls_data = convert_df_to_compatible_xls(df_out2)
+                    xls_data = convert_df_to_exact_xls(df_out2)
                     st.download_button("📥 تحميل تقرير الزيادة (.xls)", xls_data, "اصناف_الزيادة.xls", "application/vnd.ms-excel")
 
             with eq_tab3:
@@ -163,7 +162,7 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (تصد�
                 st.dataframe(df_short, use_container_width=True, hide_index=True)
                 if not df_short.empty:
                     df_out3 = df_short[["رمز المادة الرسمي", "كمية الفقد (العجز)"]].copy()
-                    xls_data = convert_df_to_compatible_xls(df_out3)
+                    xls_data = convert_df_to_exact_xls(df_out3)
                     st.download_button("📥 تحميل تقرير الفقد (.xls)", xls_data, "اصناف_الفقد.xls", "application/vnd.ms-excel")
 
             with eq_tab4:
@@ -171,7 +170,7 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (تصد�
                 df_code_surplus = eq_agg[eq_agg["كمية الزيادة"] > 0][["رمز المادة الرسمي", "كمية الزيادة"]].copy()
                 st.dataframe(df_code_surplus, use_container_width=True, hide_index=True)
                 if not df_code_surplus.empty:
-                    xls_data = convert_df_to_compatible_xls(df_code_surplus)
+                    xls_data = convert_df_to_exact_xls(df_code_surplus)
                     st.download_button("📥 تحميل رمز المادة وكمية الزيادة (.xls)", xls_data, "رمز_المادة_وكمية_الزيادة.xls", "application/vnd.ms-excel")
 
             with eq_tab5:
@@ -179,7 +178,7 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (تصد�
                 df_code_short = eq_agg[eq_agg["كمية الفقد (العجز)"] > 0][["رمز المادة الرسمي", "كمية الفقد (العجز)"]].copy()
                 st.dataframe(df_code_short, use_container_width=True, hide_index=True)
                 if not df_code_short.empty:
-                    xls_data = convert_df_to_compatible_xls(df_code_short)
+                    xls_data = convert_df_to_exact_xls(df_code_short)
                     st.download_button("📥 تحميل رمز المادة وكمية الفقد (.xls)", xls_data, "رمز_المادة_وكمية_الفقد.xls", "application/vnd.ms-excel")
 
         except Exception as e:
