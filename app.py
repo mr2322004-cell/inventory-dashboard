@@ -53,7 +53,7 @@ def format_code_as_text(val):
         pass
     return val_str
 
-# دالة لتصدير الملفات بصيغة إكسيل القديمة (.xls) بدون عناوين وهيدر
+# دالة لتصدير الملفات بصيغة إكسيل القديمة (.xls) بدون عناوين وهيدر وعمودين فقط
 def convert_df_to_xls(df_to_export):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -254,7 +254,7 @@ elif main_mode == "✅ مهام ومجموعات جرد الأسبوع (حسب �
 
     progress_pct = (completed_count / total_tasks) * 100 if total_tasks > 0 else 0
     st.progress(progress_pct / 100)
-    st.write(f`نسبة الإنجاز: **{progress_pct:.1f}%**`)
+    st.write(f"نسبة الإنجاز: **{progress_pct:.1f}%**")
 
 elif main_mode == "📊 التقرير التنفيذي (شهر 9 وشهر 10)":
     st.subheader("📊 لوحة تحكم ومؤشرات أداء الجرد (سبتمبر وأكتوبر)")
