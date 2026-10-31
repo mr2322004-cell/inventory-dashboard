@@ -24,12 +24,13 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المتكامل: لوحة مهام الأسبوع بالمجموعات والأقسام المترتبة + تقارير الشهور + تحليل الفاقد + الجرد السريع")
+st.caption("النظام المتكامل: مهام الأسبوع + معادلة الجرد اليومي المدمج + تقارير الشهور + تحليل الفاقد + الجرد السريع")
 
 main_mode = st.sidebar.radio(
     "📂 اختر القسم المطلوب:",
     [
         "✅ مهام ومجموعات جرد الأسبوع (حسب جدول الأيام)",
+        "🧮 معادلة الجرد اليومي المدمج (الفصل والتصدير الفوري)",
         "📊 التقرير التنفيذي (شهر 9 وشهر 10)", 
         "📅 تقرير الأسبوع (متابعة محمد قطان - تحليل الفاقد وأكثر 20 صنف عجز)",
         "📂 دمج ملفات الجرد اليومي وتصدير الإكسيل", 
@@ -39,16 +40,128 @@ main_mode = st.sidebar.radio(
 )
 
 # ---------------------------------------------------------
-# القسم الأول: مهام ومجموعات جرد الأسبوع (مترتبة بالأيام والمجموعات تحت بعضها)
+# القسم الجديد: معادلة الجرد اليومي المدمج وفصل الزيادة والعجز
 # ---------------------------------------------------------
-if main_mode == "✅ مهام ومجموعات جرد الأسبوع (حسب جدول الأيام)":
+if main_mode == "🧮 معادلة الجرد اليومي المدمج (الفصل والتصدير الفوري)":
+    st.subheader("🧮 معادلة الجرد اليومي المدمج (بدون تكرار وفصل الزيادة والعجز)")
+    st.caption("ارفع جميع ملفات الجرد اليومي هنا. يقوم النظام بدمجها، عدم تكرار الأصناف، حساب الفروقات، وفصل تقارير (الزيادة) و(الفقد/العجز) مع كود المادة والكمية، وتصدير إكسيل لكل تقرير.")
+
+    eq_files = st.file_uploader(
+        "📁 ارفع ملفات الجرد اليومي دفعة واحدة:", 
+        type=["xlsx", "xls", "csv"], 
+        accept_multiple_files=True
+    )
+
+    if eq_files:
+        try:
+            eq_dfs = []
+            for ef in eq_files:
+                if ef.name.endswith(".csv"):
+                    eq_dfs.append(pd.read_csv(ef, encoding="utf-8-sig"))
+                else:
+                    eq_dfs.append(pd.read_excel(ef))
+
+            combined_eq = pd.concat(eq_dfs, ignore_index=True)
+
+            # استنتاج الأعمدة بذكاء
+            c_code = "Code" if "Code" in combined_eq.columns else combined_eq.columns[0]
+            c_name = "Detail" if "Detail" in combined_eq.columns else combined_eq.columns[2]
+            c_sys = "SystemQty" if "SystemQty" in combined_eq.columns else combined_eq.columns[3]
+            c_act = "ActualQty" if "ActualQty" in combined_eq.columns else combined_eq.columns[4]
+            c_diff = "Difference" if "Difference" in combined_eq.columns else combined_eq.columns[5]
+
+            for col in combined_eq.columns:
+                cs = str(col).lower()
+                if any(k in cs for k in ["code", "كود"]): c_code = col
+                if any(k in cs for k in ["detail", "name", "صنف", "مادة"]): c_name = col
+                if any(k in cs for k in ["systemqty", "نظام"]): c_sys = col
+                if any(k in cs for k in ["actualqty", "فعلي"]): c_act = col
+                if any(k in cs for k in ["difference", "فرق"]): c_diff = col
+
+            combined_eq["كود الصنف"] = combined_eq[c_code].astype(str).str.strip()
+            combined_eq["اسم الصنف"] = combined_eq[c_name].astype(str).str.strip()
+            combined_eq["الكمية الدفترية"] = pd.to_numeric(combined_eq[c_sys], errors="coerce").fillna(0)
+            combined_eq["الكمية الفعلية"] = pd.to_numeric(combined_eq[c_act], errors="coerce").fillna(0)
+            combined_eq["الفرق"] = pd.to_numeric(combined_eq[c_diff], errors="coerce").fillna(0)
+
+            # التجميع بدون تكرار الصنف
+            eq_agg = combined_eq.groupby(["كود الصنف", "اسم الصنف"], as_index=False).agg({
+                "الكمية الدفترية": "sum",
+                "الكمية الفعلية": "sum",
+                "الفرق": "sum"
+            })
+
+            # معادلة الزيادة والعجز
+            # ملاحظة: في ملفاتك Difference = SystemQty - ActualQty (حيث العجز موجب والزيادة سالب) أو العكس حسب الملف.
+            # لنضبطها بدقة: لو الفعلى > النظامى يبقى زيادة، ولو الفعلى < النظامى يبقى عجز.
+            eq_agg["كمية الزيادة"] = eq_agg.apply(lambda r: (r["الكمية الفعلية"] - r["الكمية الدفترية"]) if r["الكمية الفعلية"] > r["الكمية الدفترية"] else 0, axis=1)
+            eq_agg["كمية الفقد (العجز)"] = eq_agg.apply(lambda r: (r["الكمية الدفترية"] - r["الكمية الفعلية"]) if r["الكمية الدفترية"] > r["الكمية الفعلية"] else 0, axis=1)
+
+            st.success(f"تم دمج عدد {len(eq_files)} ملفات بنجاح واستخراج الناتج بدون تكرار!")
+
+            eq_tab1, eq_tab2, eq_tab3, eq_tab4, eq_tab5 = st.tabs([
+                "📋 إجمالي الجرد المدمج", 
+                "➕ أصناف الزيادة", 
+                "📉 أصناف الفقد (العجز)", 
+                "📌 رمز المادة + كمية الزيادة فقط", 
+                "📌 رمز المادة + كمية الفقد فقط"
+            ])
+
+            with eq_tab1:
+                st.subheader("📋 إجمالي الجرد المدمج (كل الأصناف فوق بعض بدون تكرار)")
+                st.dataframe(eq_agg, use_container_width=True, hide_index=True)
+                csv_all = eq_agg.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 تحميل إجمالي الجرد المدمج (CSV)", csv_all, "اجمالي_الجرد_المدمج.csv", "text/csv")
+
+            with eq_tab2:
+                st.subheader("➕ الأصناف التي بها زيادة")
+                df_surplus = eq_agg[eq_agg["كمية الزيادة"] > 0].copy()
+                st.dataframe(df_surplus, use_container_width=True, hide_index=True)
+                if not df_surplus.empty:
+                    csv_surp = df_surplus.to_csv(index=False).encode('utf-8-sig')
+                    st.download_button("📥 تحميل تقرير الزيادة (CSV)", csv_surp, "اصناف_الزيادة.csv", "text/csv")
+
+            with eq_tab3:
+                st.subheader("📉 الأصناف التي بها فقد أو عجز")
+                df_short = eq_agg[eq_agg["كمية الفقد (العجز)"] > 0].copy()
+                st.dataframe(df_short, use_container_width=True, hide_index=True)
+                if not df_short.empty:
+                    csv_short = df_short.to_csv(index=False).encode('utf-8-sig')
+                    st.download_button("📥 تحميل تقرير الفقد (CSV)", csv_short, "اصناف_الفقد.csv", "text/csv")
+
+            with eq_tab4:
+                st.subheader("📌 رمز المادة وكمية الزيادة فقط")
+                df_code_surplus = eq_agg[eq_agg["كمية الزيادة"] > 0][["كود الصنف", "كمية الزيادة"]].copy()
+                df_code_surplus.columns = ["رمز المادة", "كمية الزيادة"]
+                st.dataframe(df_code_surplus, use_container_width=True, hide_index=True)
+                if not df_code_surplus.empty:
+                    csv_cs = df_code_surplus.to_csv(index=False).encode('utf-8-sig')
+                    st.download_button("📥 تحميل رمز المادة وكمية الزيادة (CSV)", csv_cs, "رمز_المادة_وكمية_الزيادة.csv", "text/csv")
+
+            with eq_tab5:
+                st.subheader("📌 رمز المادة وكمية الفقد فقط")
+                df_code_short = eq_agg[eq_agg["كمية الفقد (العجز)"] > 0][["كود الصنف", "كمية الفقد (العجز)"]].copy()
+                df_code_short.columns = ["رمز المادة", "كمية الفقد"]
+                st.dataframe(df_code_short, use_container_width=True, hide_index=True)
+                if not df_code_short.empty:
+                    csv_csh = df_code_short.to_csv(index=False).encode('utf-8-sig')
+                    st.download_button("📥 تحميل رمز المادة وكمية الفقد (CSV)", csv_csh, "رمز_المادة_وكمية_الفقد.csv", "text/csv")
+
+        except Exception as e:
+            st.error(f"حدث خطأ أثناء معالجة معادلة الجرد: {e}")
+    else:
+        st.info("👈 ارفع ملفات الجرد اليومي في زرار الرفع أعلاه لتطبيق معادلة الجرد المدمج وفصل النتائج.")
+
+# ---------------------------------------------------------
+# القسم الأول: مهام ومجموعات جرد الأسبوع
+# ---------------------------------------------------------
+elif main_mode == "✅ مهام ومجموعات جرد الأسبوع (حسب جدول الأيام)":
     st.subheader("✅ جدول ومجموعات جرد الأسبوع (متابعة محمد قطان)")
     st.caption("عرض مجموعات الأقسام مرتبة تحت بعضها حسب الأيام، مع حساب نسبة الإنجاز ومعرفة المجموعات الساقطة والمتاخدة.")
 
     today = datetime.date.today()
     current_week_number = today.isocalendar()[1]
 
-    # ترتيب المجموعات تحت بعضها بناءً على جدولك المعتمد
     tasks_schedule = {
         "🧊 السبت: جرد الثلاجة (الجبن، اللانشون، الألبان، الخضار، الصوصات، زبدة، سمنة)": False,
         "🗓️ الأحد والأربعاء (الدفعة الأولى): مناديل، حفاضات، مواد التنظيف، غسيل الملابس والصحون، عناية شخصية": False,
@@ -76,7 +189,6 @@ if main_mode == "✅ مهام ومجموعات جرد الأسبوع (حسب ج�
 
     st.divider()
 
-    # تقرير إنجاز الأسبوع والنسبة المئوية
     st.subheader("📊 تقرير إنجاز المجموعات أسبوعياً")
     progress_pct = (completed_count / total_tasks) * 100 if total_tasks > 0 else 0
     st.progress(progress_pct / 100)
@@ -109,7 +221,7 @@ if main_mode == "✅ مهام ومجموعات جرد الأسبوع (حسب ج�
         st.rerun()
 
 # ---------------------------------------------------------
-# القسم الثاني: التقرير الرئيسي (سبتمبر وأكتوبر)
+# القسم الثاني: التقرير التنفيذي (شهر 9 وشهر 10)
 # ---------------------------------------------------------
 elif main_mode == "📊 التقرير التنفيذي (شهر 9 وشهر 10)":
     st.subheader("📊 لوحة تحكم ومؤشرات أداء الجرد (سبتمبر وأكتوبر)")
@@ -410,8 +522,8 @@ else:
             base_df["الصنف والمادة"] = base_df[c_material].astype(str).str.strip()
             base_df["الكمية النظامية"] = pd.to_numeric(base_df[c_qty], errors="coerce").fillna(0)
 
-            if 'mobile_inventory_v17' not in st.session_state:
-                st.session_state['mobile_inventory_v17'] = {
+            if 'mobile_inventory_v18' not in st.session_state:
+                st.session_state['mobile_inventory_v18'] = {
                     row["الصنف والمادة"]: {"نظامي": row["الكمية النظامية"], "فعلي": row["الكمية النظامية"]}
                     for _, row in base_df.iterrows()
                 }
@@ -436,10 +548,10 @@ else:
                     item_name = row["الصنف والمادة"]
                     sys_q = row["الكمية النظامية"]
                     
-                    if item_name not in st.session_state['mobile_inventory_v17']:
-                        st.session_state['mobile_inventory_v17'][item_name] = {"نظامي": sys_q, "فعلي": sys_q}
+                    if item_name not in st.session_state['mobile_inventory_v18']:
+                        st.session_state['mobile_inventory_v18'][item_name] = {"نظامي": sys_q, "فعلي": sys_q}
 
-                    current_actual = st.session_state['mobile_inventory_v17'][item_name]["فعلي"]
+                    current_actual = st.session_state['mobile_inventory_v18'][item_name]["فعلي"]
 
                     col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
                     col1.markdown(f"**{item_name}**")
@@ -448,11 +560,11 @@ else:
                     new_act = col3.number_input(
                         "الفعلي", 
                         value=float(current_actual), 
-                        key=f"act_direct_v17_{idx}",
+                        key=f"act_direct_v18_{idx}",
                         label_visibility="collapsed"
                     )
                     
-                    st.session_state['mobile_inventory_v17'][item_name]["فعلي"] = new_act
+                    st.session_state['mobile_inventory_v18'][item_name]["فعلي"] = new_act
                     
                     diff = new_act - sys_q
                     
@@ -468,7 +580,7 @@ else:
                 st.subheader("⚠️ الأصناف التي لم يتم تعديلها أو جردها بعد (مطابقة للنظام)")
                 ungraced_list = [
                     {"الصنف والمادة": k, "الكمية النظامية": v["نظامي"], "الكمية الفعلية": v["فعلي"]}
-                    for k, v in st.session_state['mobile_inventory_v17'].items() if v["نظامي"] == v["فعلي"]
+                    for k, v in st.session_state['mobile_inventory_v18'].items() if v["نظامي"] == v["فعلي"]
                 ]
                 df_ungraced = pd.DataFrame(ungraced_list)
                 st.info(f"إجمالي الأصناف التي بنفس الكمية النظامية: {len(df_ungraced)} صنف")
@@ -478,7 +590,7 @@ else:
             with scan_tab3:
                 st.subheader("📥 تقرير نتائج الجرد النهائي وتصدير الإكسيل")
                 final_list = []
-                for k, v in st.session_state['mobile_inventory_v17'].items():
+                for k, v in st.session_state['mobile_inventory_v18'].items():
                     diff = v["فعلي"] - v["نظامي"]
                     if diff < 0:
                         status = "عجز (نقص)"
