@@ -24,12 +24,12 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المبسط: معادلة الجرد اليومي المدمج + تقرير الأسبوع")
+st.caption("النظام المبسط: معادلة الجرد اليومي المدمج (رمز الصنف + اسم الصنف + الكمية) + تقرير الأسبوع")
 
 main_mode = st.sidebar.radio(
     "📂 الأقسام الرئيسية:",
     [
-        "🧮 معادلة الجرد اليومي المدمج (تصدير .xls متوافق)",
+        "🧮 معادلة الجرد اليومي المدمج",
         "✅ تقرير ومجموعات جرد الأسبوع"
     ]
 )
@@ -47,19 +47,19 @@ def format_code_as_text(val):
         pass
     return val_str
 
-# دالة التصدير باستخدام openpyxl المتاح دائماً
-def convert_df_to_exact_xls(df_to_export):
+# دالة تصدير الإكسيل الحديثة والقياسية (.xlsx)
+def convert_df_to_excel(df_to_export):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df_to_export.to_excel(writer, index=False, header=False, sheet_name='Sheet1')
+        df_to_export.to_excel(writer, index=False, sheet_name='Sheet1')
     return output.getvalue()
 
 # ---------------------------------------------------------
 # 1. معادلة الجرد اليومي المدمج
 # ---------------------------------------------------------
-if main_mode == "🧮 معادلة الجرد اليومي المدمج (تصدير .xls متوافق)":
-    st.subheader("🧮 معادلة الجرد اليومي المدمج (استخراج رمز المادة الرسمي وتصدير .xls)")
-    st.caption("ارفع أولاً ملف (رمز المادة الأساسي)، ثم ارفع ملفات الجرد اليومي لدمجها واستخراج الرموز وحفظ الملف بالصيغة المقبولة.")
+if main_mode == "🧮 معادلة الجرد اليومي المدمج":
+    st.subheader("🧮 معادلة الجرد اليومي المدمج (رمز الصنف، اسم الصنف، والكمية)")
+    st.caption("ارفع أولاً ملف (رمز المادة الأساسي)، ثم ارفع ملفات الجرد اليومي لاستخراج التقارير بالصيغة المطلوبة.")
 
     master_file = st.file_uploader("📁 1. ارفع الملف الأساسي (رمز المادة.xlsx):", type=["xlsx", "xls"])
     
@@ -135,50 +135,47 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج (تصد�
                 "📋 إجمالي الجرد المدمج", 
                 "➕ أصناف الزيادة", 
                 "📉 أصناف الفقد (العجز)", 
-                "📌 رمز المادة الرسمي + كمية الزيادة (.xls)", 
-                "📌 رمز المادة الرسمي + كمية الفقد (.xls)"
+                "📌 رمز الصنف + اسم الصنف + كمية الزيادة", 
+                "📌 رمز الصنف + اسم الصنف + كمية الفقد"
             ])
 
             with eq_tab1:
                 st.subheader("📋 إجمالي الجرد المدمج")
                 st.dataframe(eq_agg, use_container_width=True, hide_index=True)
-                df_out1 = eq_agg[["رمز المادة الرسمي", "الفرق"]].copy()
-                xls_data = convert_df_to_exact_xls(df_out1)
-                st.download_button("📥 تحميل إجمالي الجرد (.xls)", xls_data, "اجمالي_الجرد.xls", "application/vnd.ms-excel")
+                excel_data = convert_df_to_excel(eq_agg)
+                st.download_button("📥 تحميل إجمالي الجرد (Excel)", excel_data, "اجمالي_الجرد.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
             with eq_tab2:
                 st.subheader("➕ الأصناف التي بها زيادة")
                 df_surplus = eq_agg[eq_agg["كمية الزيادة"] > 0].copy()
                 st.dataframe(df_surplus, use_container_width=True, hide_index=True)
                 if not df_surplus.empty:
-                    df_out2 = df_surplus[["رمز المادة الرسمي", "كمية الزيادة"]].copy()
-                    xls_data = convert_df_to_exact_xls(df_out2)
-                    st.download_button("📥 تحميل تقرير الزيادة (.xls)", xls_data, "اصناف_الزيادة.xls", "application/vnd.ms-excel")
+                    excel_data = convert_df_to_excel(df_surplus)
+                    st.download_button("📥 تحميل تقرير الزيادة (Excel)", excel_data, "اصناف_الزيادة.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
             with eq_tab3:
                 st.subheader("📉 الأصناف التي بها فقد أو عجز")
                 df_short = eq_agg[eq_agg["كمية الفقد (العجز)"] > 0].copy()
                 st.dataframe(df_short, use_container_width=True, hide_index=True)
                 if not df_short.empty:
-                    df_out3 = df_short[["رمز المادة الرسمي", "كمية الفقد (العجز)"]].copy()
-                    xls_data = convert_df_to_exact_xls(df_out3)
-                    st.download_button("📥 تحميل تقرير الفقد (.xls)", xls_data, "اصناف_الفقد.xls", "application/vnd.ms-excel")
+                    excel_data = convert_df_to_excel(df_short)
+                    st.download_button("📥 تحميل تقرير الفقد (Excel)", excel_data, "اصناف_الفقد.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
             with eq_tab4:
-                st.subheader("📌 رمز المادة الرسمي وكمية الزيادة فقط (.xls)")
-                df_code_surplus = eq_agg[eq_agg["كمية الزيادة"] > 0][["رمز المادة الرسمي", "كمية الزيادة"]].copy()
+                st.subheader("📌 رمز الصنف + اسم الصنف + كمية الزيادة")
+                df_code_surplus = eq_agg[eq_agg["كمية الزيادة"] > 0][["رمز المادة الرسمي", "اسم الصنف", "كمية الزيادة"]].copy()
                 st.dataframe(df_code_surplus, use_container_width=True, hide_index=True)
                 if not df_code_surplus.empty:
-                    xls_data = convert_df_to_exact_xls(df_code_surplus)
-                    st.download_button("📥 تحميل رمز المادة وكمية الزيادة (.xls)", xls_data, "رمز_المادة_وكمية_الزيادة.xls", "application/vnd.ms-excel")
+                    excel_data = convert_df_to_excel(df_code_surplus)
+                    st.download_button("📥 تحميل تقرير الزيادة (رمز واسم وكمية)", excel_data, "رمز_واسم_وكمية_الزيادة.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
             with eq_tab5:
-                st.subheader("📌 رمز المادة الرسمي وكمية الفقد فقط (.xls)")
-                df_code_short = eq_agg[eq_agg["كمية الفقد (العجز)"] > 0][["رمز المادة الرسمي", "كمية الفقد (العجز)"]].copy()
+                st.subheader("📌 رمز الصنف + اسم الصنف + كمية الفقد (العجز)")
+                df_code_short = eq_agg[eq_agg["كمية الفقد (العجز)"] > 0][["رمز المادة الرسمي", "اسم الصنف", "كمية الفقد (العجز)"]].copy()
                 st.dataframe(df_code_short, use_container_width=True, hide_index=True)
                 if not df_code_short.empty:
-                    xls_data = convert_df_to_exact_xls(df_code_short)
-                    st.download_button("📥 تحميل رمز المادة وكمية الفقد (.xls)", xls_data, "رمز_المادة_وكمية_الفقد.xls", "application/vnd.ms-excel")
+                    excel_data = convert_df_to_excel(df_code_short)
+                    st.download_button("📥 تحميل تقرير الفقد (رمز واسم وكمية)", excel_data, "رمز_واسم_وكمية_الفقد.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
         except Exception as e:
             st.error(f"حدث خطأ أثناء معالجة معادلة الجرد: {e}")
