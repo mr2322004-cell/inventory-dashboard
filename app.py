@@ -2,7 +2,6 @@ import io
 import pandas as pd
 import streamlit as st
 import datetime
-import difflib
 
 st.set_page_config(
     page_title="متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي",
@@ -32,12 +31,12 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المبسط: جرد أصناف الطلب (كمية النظام وخانة الكمية الفعلية) + معادلة الجرد اليومي + تقرير الأسبوع")
+st.caption("النظام المبسط: جرد أصناف المخزن مباشرة + معادلة الجرد اليومي + تقرير الأسبوع")
 
 main_mode = st.sidebar.radio(
     "📂 الأقسام الرئيسية:",
     [
-        "🛒 جرد الطلبات والكميات",
+        "🛒 جرد الأصناف والكميات",
         "🧮 معادلة الجرد اليومي المدمج",
         "✅ تقرير ومجموعات جرد الأسبوع"
     ]
@@ -62,31 +61,12 @@ def convert_df_to_excel(df_to_export):
         df_to_export.to_excel(writer, index=False, sheet_name='Sheet1')
     return output.getvalue()
 
-# قائمة أصناف الطلب المستخرجة من ملفات الـ PDF
-pdf_order_items = [
-    "تيفاني بريك 2 صباع 12.5 جم", "شيبسي كباب عالفحم ب 5", "شيبسي خل وملح ب 10", "شيبسي جبنة ب 10",
-    "شيبسي ملح ب 10", "شيبسي جبنة البارميزان 10 ج", "شيبسي شطة وليمون ب 10", "شيبسي بطعم جبنة متبلة ب 10",
-    "فن داي كيك بنكهة الفانيليا وقطع الفواكة", "لارش كيك 10 ج", "رونیسكا بسكويت بالشوكولا ب 3 ج",
-    "تيفاني بريك داي بريك شوكولاه بالبندق 16 جم", "ريتش بيك توست بالحليب غ500", "ريتش بيك توست سادة 500غ",
-    "تيفاني بريك 4 اصابع 25 جم", "تيفاني بريكيستا 13 جم", "شيبسي كرانشي فراخ ب 10 ج",
-    "شيبسي ويفي فراخ بالصوص الحار ب 15 ج", "بسكويت سادة جامبو", "مندولين ويفر بالشوكولا جم 33 ب 10 ج",
-    "جيلي عيون ب 5 ج", "لارش كيك بالكراميل 10 ج", "كيك لارش مولتن كيك", "ديمة سوفتي بالتمر 21 غ",
-    "شوكولا ليرات ع10", "من و سلوی رش", "بسكو مصر ويفر ب 5 ج", "زيرو بروتين بار ۵۰جم بطعم القهوة",
-    "بيج شيبسي فلفل حار مدخن ب 20 ج", "بیج شيبسي بالكريمة المتبلة ب 10 ج", "تيفاني بريك داي بريك شوكولاه 25 جم",
-    "ماجیکال مارشميلو 5 ج", "بيبيتو جيلي ب 5 ج", "اصابع هريسة اللوز", "ابوالوفا كرواسون", "بسكوت روكستا 2 ق",
-    "شيبسي وافي رانش جبنة مع لسعة ليمون 10 ج", "تيفاني شنكوز كوكيز شوكولا", "دومتي باتيه ب 15 ج بطعم جبنة كريمي سادة",
-    "دومتي باتيه ب 15 ج بطعم فيتا بالزيتون", "دومتي باتيه ب 15 ج بطعم كريمي رومي", "شيبسي جبنة متبلة ب 7 ج",
-    "بريدواي باتيه بالشوكولا", "بريدواي باتيه جبنة هلابينو", "شيبسي فراخ مع الصوص الحار ب 10 ج",
-    "توست توستيلا سادة 500 جم", "بيج شيبسي بالليمون المولع ب 15 ج", "دومتي كرواسون ب 15 ج بطعم بالفلمنك",
-    "دومتي باتيه ب ١٥ ج بطعم مربى التين"
-]
-
 # ---------------------------------------------------------
-# 1. قسم جرد الطلبات والكميات
+# 1. قسم جرد الأصناف والكميات (مباشرة من ملف كميات.xlsx بدون PDF)
 # ---------------------------------------------------------
-if main_mode == "🛒 جرد الطلبات والكميات":
-    st.subheader("🛒 جرد أصناف الطلب (كمية النظام وإدخال الكمية الفعلية)")
-    st.caption("ارفع ملف `كميات.xlsx` ليسحب كمية النظام لكل صنف تلقائياً مع خانة لإدخال الكمية الفعلية.")
+if main_mode == "🛒 جرد الأصناف والكميات":
+    st.subheader("🛒 جرد أصناف المخزن (عرض كميات النظام وإدخال الكمية الفعلية)")
+    st.caption("ارفع ملف `كميات.xlsx` لعرض الأصناف وأكوادها وكميات النظام مباشرة مع خانة لإدخال الكمية الفعلية.")
 
     qty_file = st.file_uploader("📁 ارفع ملف كميات المخزن (كميات.xlsx):", type=["xlsx", "xls"])
 
@@ -100,11 +80,15 @@ if main_mode == "🛒 جرد الطلبات والكميات":
             st.error(f"خطأ في قراءة الملف: {e}")
 
     if df_qty is not None:
+        # اكتشاف أعمدة الكود، الصنف، والكمية تلقائياً
+        code_col = None
         item_col = None
         qty_col = None
 
         for col in df_qty.columns:
             c_lower = col.lower()
+            if any(k in c_lower for k in ["code", "كود"]):
+                code_col = col
             if any(k in c_lower for k in ["صنف", "اسم", "مادة", "detail", "name", "item"]):
                 if item_col is None:
                     item_col = col
@@ -112,43 +96,26 @@ if main_mode == "🛒 جرد الطلبات والكميات":
                 if qty_col is None:
                     qty_col = col
 
+        # بدائل احتياطية إذا لم تتطابق الأسماء
         if item_col is None:
             item_col = df_qty.columns[1] if len(df_qty.columns) > 1 else df_qty.columns[0]
         if qty_col is None:
             qty_col = df_qty.columns[-1]
 
         df_qty = df_qty.dropna(subset=[item_col]).copy()
-        df_qty[item_col] = df_qty[item_col].astype(str).str.strip()
-        df_qty[qty_col] = pd.to_numeric(df_qty[qty_col], errors="coerce").fillna(0.0)
-
+        
         st.markdown("---")
         inventory_data = []
-        excel_items_list = df_qty[item_col].tolist()
 
-        for i, item in enumerate(pdf_order_items):
-            system_qty = 0.0
-            matched_name = "غير مطابق"
-
-            for _, row in df_qty.iterrows():
-                excel_item = row[item_col]
-                if item in excel_item or excel_item in item:
-                    system_qty = float(row[qty_col])
-                    matched_name = excel_item
-                    break
-
-            if matched_name == "غير مطابق" and excel_items_list:
-                matches = difflib.get_close_matches(item, excel_items_list, n=1, cutoff=0.3)
-                if matches:
-                    matched_row = df_qty[df_qty[item_col] == matches[0]]
-                    if not matched_row.empty:
-                        system_qty = float(matched_row.iloc[0][qty_col])
-                        matched_name = matches[0]
+        for i, row in df_qty.iterrows():
+            item_name = str(row[item_col]).strip() if pd.notna(row[item_col]) else ""
+            item_code = str(row[code_col]).strip() if (code_col and pd.notna(row[code_col])) else f"PRD-{i+1}"
+            system_qty = float(row[qty_col]) if pd.notna(row[qty_col]) else 0.0
 
             with st.container():
                 st.markdown(f"""
                 <div style="background: #151f32; padding: 12px; border-radius: 10px; border: 1px solid #29364b; margin-bottom: 10px;">
-                    <h4 style="margin: 0; color: #38bdf8;">📦 {i+1}. {item}</h4>
-                    <p style="margin: 2px 0 0 0; font-size: 13px; color: #94a3b8;">مطابق في النظام: {matched_name}</p>
+                    <h4 style="margin: 0; color: #38bdf8;">📦 الكود: {item_code} | {item_name}</h4>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -160,8 +127,8 @@ if main_mode == "🛒 جرد الطلبات والكميات":
 
             inventory_data.append({
                 "م": i + 1,
-                "اسم الصنف": item,
-                "الصنف المطابق بالملف": matched_name,
+                "كود الصنف": item_code,
+                "اسم الصنف": item_name,
                 "كمية النظام": system_qty,
                 "الكمية الفعلية": actual_qty
             })
@@ -173,11 +140,11 @@ if main_mode == "🛒 جرد الطلبات والكميات":
             st.download_button(
                 "📥 تحميل تقرير الجرد (Excel)",
                 excel_bytes,
-                "تقرير_جرد_الطلبات.xlsx",
+                "تقرير_جرد_المخزن.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
     else:
-        st.info("👈 يرجى رفع ملف `كميات.xlsx` أعلاه لعرض المنتجات وربط كميات النظام تلقائياً.")
+        st.info("👈 يرجى رفع ملف `كميات.xlsx` أعلاه لعرض أصناف المخزن مباشرة.")
 
 # ---------------------------------------------------------
 # 2. معادلة الجرد اليومي المدمج
