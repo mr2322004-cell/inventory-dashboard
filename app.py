@@ -1,4 +1,5 @@
 import io
+import os
 import pandas as pd
 import streamlit as st
 import datetime
@@ -21,23 +22,16 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
     border: 1px solid #29364b;
     border-radius: 14px;
 }
-.product-card {
-    background: #151f32;
-    padding: 15px;
-    border-radius: 12px;
-    border: 1px solid #29364b;
-    margin-bottom: 15px;
-}
 </style>
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المبسط: جرد أصناف الطلب (بالصور، كمية النظام، وخانة الكمية الفعلية) + معادلة الجرد اليومي + تقرير الأسبوع")
+st.caption("النظام المبسط: جرد أصناف الطلب بالصور الأصلية الحقيقية من الفاتورة + كمية النظام وخانة الكمية الفعلية")
 
 main_mode = st.sidebar.radio(
     "📂 الأقسام الرئيسية:",
     [
-        "🛒 جرد الطلبات بالصور والكميات",
+        "🛒 جرد الطلبات بالصور الأصلية والكميات",
         "🧮 معادلة الجرد اليومي المدمج",
         "✅ تقرير ومجموعات جرد الأسبوع"
     ]
@@ -62,7 +56,7 @@ def convert_df_to_excel(df_to_export):
         df_to_export.to_excel(writer, index=False, sheet_name='Sheet1')
     return output.getvalue()
 
-# قائمة أصناف الطلب المستخرجة من ملفات الـ PDF
+# قائمة أصناف الطلب وترتيبها المطابق للصور المستخرجة
 pdf_order_items = [
     "تيفاني بريك 2 صباع 12.5 جم", "شيبسي كباب عالفحم ب 5", "شيبسي خل وملح ب 10", "شيبسي جبنة ب 10",
     "شيبسي ملح ب 10", "شيبسي جبنة البارميزان 10 ج", "شيبسي شطة وليمون ب 10", "شيبسي بطعم جبنة متبلة ب 10",
@@ -82,11 +76,11 @@ pdf_order_items = [
 ]
 
 # ---------------------------------------------------------
-# 1. قسم جرد الطلبات بالصور والكميات
+# 1. قسم جرد الطلبات بالصور الأصلية والكميات
 # ---------------------------------------------------------
-if main_mode == "🛒 جرد الطلبات بالصور والكميات":
-    st.subheader("🛒 جرد أصناف الطلب (عرض الصور، كمية النظام، وإدخال الكمية الفعلية)")
-    st.caption("ارفع ملف `كميات.xlsx` ليسحب كمية النظام لكل صنف تلقائياً، مع عرض صورة المنتج وخانة فارغة للكمية الفعلية.")
+if main_mode == "🛒 جرد الطلبات بالصور الأصلية والكميات":
+    st.subheader("🛒 جرد أصناف الطلب (عرض الصور الحقيقية، كمية النظام، وإدخال الكمية الفعلية)")
+    st.caption("ارفع ملف `كميات.xlsx` ليسحب كمية النظام لكل صنف تلقائياً، مع عرض صورة المنتج الأصلية من الطلب.")
 
     qty_file = st.file_uploader("📁 ارفع ملف كميات المخزن (كميات.xlsx):", type=["xlsx", "xls"])
 
@@ -102,6 +96,9 @@ if main_mode == "🛒 جرد الطلبات بالصور والكميات":
         st.markdown("---")
         inventory_data = []
         
+        # قائمة ملفات الصور المستخرجة
+        img_files = sorted([f for f in os.listdir("extracted_product_images") if f.endswith(('.jpg', '.png'))])
+
         for i, item in enumerate(pdf_order_items):
             system_qty = 0.0
             matched_name = "غير مطابق"
@@ -119,10 +116,9 @@ if main_mode == "🛒 جرد الطلبات بالصور والكميات":
                         system_qty = float(matched_row.iloc[0]['الكمية الحالية'])
                         matched_name = matches[0]
 
-            # تصميم بطاقة المنتج مع صورة توضيحية واسم الصنف
             with st.container():
                 st.markdown(f"""
-                <div style="background: #151f32; padding: 12px; border-radius: 10px; border: 1px solid #29364b; margin-bottom: 10px;">
+                <div style="background: #151f32; padding: 10px; border-radius: 8px; border: 1px solid #29364b; margin-bottom: 5px;">
                     <h4 style="margin: 0; color: #38bdf8;">📦 {i+1}. {item}</h4>
                     <p style="margin: 2px 0 0 0; font-size: 13px; color: #94a3b8;">مطابق في النظام: {matched_name}</p>
                 </div>
@@ -130,8 +126,12 @@ if main_mode == "🛒 جرد الطلبات بالصور والكميات":
 
                 col_img, col_sys, col_act, col_diff = st.columns([1, 2, 2, 2])
                 with col_img:
-                    # عرض صورة مصغرة توضيحية لكل صنف
-                    st.image("https://images.unsplash.com/photo-1586816001966-79b736744398?w=100&auto=format&fit=crop&q=60", width=70)
+                    # عرض الصورة الحقيقية المستخرجة من الـ PDF
+                    if i < len(img_files):
+                        img_path = os.path.join("extracted_product_images", img_files[i])
+                        st.image(img_path, width=80)
+                    else:
+                        st.write("🖼️ صورة غير متوفرة")
                 with col_sys:
                     st.metric("كمية النظام", f"{system_qty}")
                 with col_act:
@@ -156,11 +156,11 @@ if main_mode == "🛒 جرد الطلبات بالصور والكميات":
             st.download_button(
                 "📥 تحميل تقرير الجرد (Excel)",
                 excel_bytes,
-                "تقرير_جرد_الطلبات_بالصور.xlsx",
+                "تقرير_جرد_الطلبات_بالصور_الأصلية.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
     else:
-        st.info("👈 يرجى رفع ملف `كميات.xlsx` أعلاه لعرض المنتجات بالصور وربط كميات النظام تلقائياً.")
+        st.info("👈 يرجى رفع ملف `كميات.xlsx` أعلاه لعرض المنتجات بصورها الأصلية وربط كميات النظام تلقائياً.")
 
 # ---------------------------------------------------------
 # 2. معادلة الجرد اليومي المدمج
@@ -301,7 +301,7 @@ else:
         "🧊 السبت: جرد الثلاجة (الجبن، اللانشون، الألبان، الخضار، الصوصات، زبدة، سمنة)": False,
         "🗓️ الأحد والأربعاء (الدفعة الأولى): مناديل، حفاضات، مواد التنظيف، غسيل الملابس والصحون، عناية شخصية": False,
         "🗓️ الإثنين: شيبس و سناكس، بسكويت وعلويات، نودلز، بقوليات سابية، إيس كريم، تمور، كاندي": False,
-        "📦 الثلاثاء: جرد المخزن الشامل (بهارات، زيت وزيتون، دقيق وسكر، كورن فليكس، بن، حبوب)": False,
+        "📦 الثلاثاء: جرد المخزن الشامل (بهارات، زيت وزيتون، دقيق والسكر، كورن فليكس، بن، حبوب)": False,
         "🗓️ الأربعاء والسبت (الدفعة الثانية): أخري استخدام مرة واحدة، بطاريات، منعمات الأقمشة، معطر جو، مبيدات حشرية": False,
         "🗓️ الخميس: المتبقيات والأقسام الإضافية (مشروم، ورق عنب، مخلل، صلصة، ضيافة العيد)": False,
     }
