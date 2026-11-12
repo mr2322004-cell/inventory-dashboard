@@ -2,9 +2,10 @@ import io
 import pandas as pd
 import streamlit as st
 import datetime
+import difflib
 
 st.set_page_config(
-    page_title="متابعة محمد قطان - نظام إدارة المخازن",
+    page_title="متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي",
     page_icon="📦",
     layout="wide",
 )
@@ -20,15 +21,23 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
     border: 1px solid #29364b;
     border-radius: 14px;
 }
+.product-card {
+    background: #151f32;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #29364b;
+    margin-bottom: 15px;
+}
 </style>
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المبسط: معادلة الجرد اليومي المدمج (رمز الصنف + اسم الصنف + الكمية) + تقرير الأسبوع")
+st.caption("النظام المبسط: جرد أصناف الطلب (بالصور، كمية النظام، وخانة الكمية الفعلية) + معادلة الجرد اليومي + تقرير الأسبوع")
 
 main_mode = st.sidebar.radio(
     "📂 الأقسام الرئيسية:",
     [
+        "🛒 جرد الطلبات بالصور والكميات",
         "🧮 معادلة الجرد اليومي المدمج",
         "✅ تقرير ومجموعات جرد الأسبوع"
     ]
@@ -47,17 +56,116 @@ def format_code_as_text(val):
         pass
     return val_str
 
-# دالة تصدير الإكسيل الحديثة والقياسية (.xlsx)
 def convert_df_to_excel(df_to_export):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df_to_export.to_excel(writer, index=False, sheet_name='Sheet1')
     return output.getvalue()
 
+# قائمة أصناف الطلب المستخرجة من ملفات الـ PDF
+pdf_order_items = [
+    "تيفاني بريك 2 صباع 12.5 جم", "شيبسي كباب عالفحم ب 5", "شيبسي خل وملح ب 10", "شيبسي جبنة ب 10",
+    "شيبسي ملح ب 10", "شيبسي جبنة البارميزان 10 ج", "شيبسي شطة وليمون ب 10", "شيبسي بطعم جبنة متبلة ب 10",
+    "فن داي كيك بنكهة الفانيليا وقطع الفواكة", "لارش كيك 10 ج", "رونیسكا بسكويت بالشوكولا ب 3 ج",
+    "تيفاني بريك داي بريك شوكولاه بالبندق 16 جم", "ريتش بيك توست بالحليب غ500", "ريتش بيك توست سادة 500غ",
+    "تيفاني بريك 4 اصابع 25 جم", "تيفاني بريكيستا 13 جم", "شيبسي كرانشي فراخ ب 10 ج",
+    "شيبسي ويفي فراخ بالصوص الحار ب 15 ج", "بسكويت سادة جامبو", "مندولين ويفر بالشوكولا جم 33 ب 10 ج",
+    "جيلي عيون ب 5 ج", "لارش كيك بالكراميل 10 ج", "كيك لارش مولتن كيك", "ديمة سوفتي بالتمر 21 غ",
+    "شوكولا ليرات ع10", "من و سلوی رش", "بسكو مصر ويفر ب 5 ج", "زيرو بروتين بار ۵۰جم بطعم القهوة",
+    "بيج شيبسي فلفل حار مدخن ب 20 ج", "بیج شيبسي بالكريمة المتبلة ب 10 ج", "تيفاني بريك داي بريك شوكولاه 25 جم",
+    "ماجیکال مارشميلو 5 ج", "بيبيتو جيلي ب 5 ج", "اصابع هريسة اللوز", "ابوالوفا كرواسون", "بسكوت روكستا 2 ق",
+    "شيبسي وافي رانش جبنة مع لسعة ليمون 10 ج", "تيفاني شنكوز كوكيز شوكولا", "دومتي باتيه ب 15 ج بطعم جبنة كريمي سادة",
+    "دومتي باتيه ب 15 ج بطعم فيتا بالزيتون", "دومتي باتيه ب 15 ج بطعم كريمي رومي", "شيبسي جبنة متبلة ب 7 ج",
+    "بريدواي باتيه بالشوكولا", "بريدواي باتيه جبنة هلابينو", "شيبسي فراخ مع الصوص الحار ب 10 ج",
+    "توست توستيلا سادة 500 جم", "بيج شيبسي بالليمون المولع ب 15 ج", "دومتي كرواسون ب 15 ج بطعم بالفلمنك",
+    "دومتي باتيه ب ١٥ ج بطعم مربى التين"
+]
+
 # ---------------------------------------------------------
-# 1. معادلة الجرد اليومي المدمج
+# 1. قسم جرد الطلبات بالصور والكميات
 # ---------------------------------------------------------
-if main_mode == "🧮 معادلة الجرد اليومي المدمج":
+if main_mode == "🛒 جرد الطلبات بالصور والكميات":
+    st.subheader("🛒 جرد أصناف الطلب (عرض الصور، كمية النظام، وإدخال الكمية الفعلية)")
+    st.caption("ارفع ملف `كميات.xlsx` ليسحب كمية النظام لكل صنف تلقائياً، مع عرض صورة المنتج وخانة فارغة للكمية الفعلية.")
+
+    qty_file = st.file_uploader("📁 ارفع ملف كميات المخزن (كميات.xlsx):", type=["xlsx", "xls"])
+
+    df_qty = None
+    if qty_file is not None:
+        try:
+            df_qty = pd.read_excel(qty_file)
+            st.success("تم قراءة ملف الكميات بنجاح!")
+        except Exception as e:
+            st.error(f"خطأ في قراءة الملف: {e}")
+
+    if df_qty is not None:
+        st.markdown("---")
+        inventory_data = []
+        
+        for i, item in enumerate(pdf_order_items):
+            system_qty = 0.0
+            matched_name = "غير مطابق"
+            for _, row in df_qty.iterrows():
+                excel_item = str(row['الصنف'])
+                if item in excel_item or excel_item in item:
+                    system_qty = float(row['الكمية الحالية'])
+                    matched_name = excel_item
+                    break
+            if matched_name == "غير مطابق":
+                matches = difflib.get_close_matches(item, df_qty['الصنف'].astype(str).tolist(), n=1, cutoff=0.3)
+                if matches:
+                    matched_row = df_qty[df_qty['الصنف'].astype(str) == matches[0]]
+                    if not matched_row.empty:
+                        system_qty = float(matched_row.iloc[0]['الكمية الحالية'])
+                        matched_name = matches[0]
+
+            # تصميم بطاقة المنتج مع صورة توضيحية واسم الصنف
+            with st.container():
+                st.markdown(f"""
+                <div style="background: #151f32; padding: 12px; border-radius: 10px; border: 1px solid #29364b; margin-bottom: 10px;">
+                    <h4 style="margin: 0; color: #38bdf8;">📦 {i+1}. {item}</h4>
+                    <p style="margin: 2px 0 0 0; font-size: 13px; color: #94a3b8;">مطابق في النظام: {matched_name}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                col_img, col_sys, col_act, col_diff = st.columns([1, 2, 2, 2])
+                with col_img:
+                    # عرض صورة مصغرة توضيحية لكل صنف
+                    st.image("https://images.unsplash.com/photo-1586816001966-79b736744398?w=100&auto=format&fit=crop&q=60", width=70)
+                with col_sys:
+                    st.metric("كمية النظام", f"{system_qty}")
+                with col_act:
+                    actual_qty = st.number_input("الكمية الفعلية", min_value=0.0, step=1.0, key=f"act_{i}", label_visibility="collapsed")
+                with col_diff:
+                    diff = actual_qty - system_qty
+                    st.metric("الفرق", f"{diff}", delta=f"{diff}")
+
+            inventory_data.append({
+                "م": i+1,
+                "اسم الصنف": item,
+                "الصنف المطابق بالملف": matched_name,
+                "كمية النظام": system_qty,
+                "الكمية الفعلية": actual_qty,
+                "الفرق": diff
+            })
+            st.markdown("---")
+
+        if st.button("💾 حفظ وتصدير تقرير الجرد بالصور (Excel)"):
+            df_result = pd.DataFrame(inventory_data)
+            excel_bytes = convert_df_to_excel(df_result)
+            st.download_button(
+                "📥 تحميل تقرير الجرد (Excel)",
+                excel_bytes,
+                "تقرير_جرد_الطلبات_بالصور.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+    else:
+        st.info("👈 يرجى رفع ملف `كميات.xlsx` أعلاه لعرض المنتجات بالصور وربط كميات النظام تلقائياً.")
+
+# ---------------------------------------------------------
+# 2. معادلة الجرد اليومي المدمج
+# ---------------------------------------------------------
+elif main_mode == "🧮 معادلة الجرد اليومي المدمج":
     st.subheader("🧮 معادلة الجرد اليومي المدمج (رمز الصنف، اسم الصنف، والكمية)")
     st.caption("ارفع أولاً ملف (رمز المادة الأساسي)، ثم ارفع ملفات الجرد اليومي لاستخراج التقارير بالصيغة المطلوبة.")
 
@@ -183,7 +291,7 @@ if main_mode == "🧮 معادلة الجرد اليومي المدمج":
         st.info("👈 يرجى رفع الملف الأساسي (رمز المادة) أولاً، ثم رفع ملفات الجرد اليومي لتظهر النتائج فوراً.")
 
 # ---------------------------------------------------------
-# 2. تقرير ومجموعات جرد الأسبوع
+# 3. تقرير ومجموعات جرد الأسبوع
 # ---------------------------------------------------------
 else:
     st.subheader("✅ جدول ومجموعات جرد الأسبوع (متابعة محمد قطان)")
