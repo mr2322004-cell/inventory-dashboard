@@ -52,7 +52,7 @@ def format_code_as_text(val):
     try:
         if "e" in val_str.lower():
             val_str = f"{float(val_str):.0f}"
-    except:
+    except Exception:
         pass
     return val_str
 
@@ -94,14 +94,12 @@ if main_mode == "🛒 جرد الطلبات والكميات":
     if qty_file is not None:
         try:
             df_qty = pd.read_excel(qty_file)
-            # تنظيف أسماء الأعمدة من المسافات الزائدة
             df_qty.columns = [str(c).strip() for c in df_qty.columns]
             st.success("تم قراءة ملف الكميات بنجاح!")
         except Exception as e:
             st.error(f"خطأ في قراءة الملف: {e}")
 
     if df_qty is not None:
-        # اكتشاف عمود الصنف وعمود الكمية تلقائياً لتجنب KeyError
         item_col = None
         qty_col = None
 
@@ -114,13 +112,11 @@ if main_mode == "🛒 جرد الطلبات والكميات":
                 if qty_col is None:
                     qty_col = col
 
-        # بديل احتياطي إذا لم تتطابق الأسماء
         if item_col is None:
             item_col = df_qty.columns[1] if len(df_qty.columns) > 1 else df_qty.columns[0]
         if qty_col is None:
             qty_col = df_qty.columns[-1]
 
-        # تنظيف البيانات وتجاهل الصفوف الفارغة
         df_qty = df_qty.dropna(subset=[item_col]).copy()
         df_qty[item_col] = df_qty[item_col].astype(str).str.strip()
         df_qty[qty_col] = pd.to_numeric(df_qty[qty_col], errors="coerce").fillna(0.0)
@@ -232,10 +228,14 @@ elif main_mode == "🧮 معادلة الجرد اليومي المدمج":
 
             for col in combined_eq.columns:
                 cs = str(col).lower()
-                if any(k in cs for k in ["code", "كود"]): c_code = col
-                if any(k in cs for k in ["detail", "name", "صنف", "مادة"]): c_name = col
-                if any(k in cs for k in ["systemqty", "دفترية", "نظام"]): c_sys = col
-                if any(k in cs for k in ["actualqty", "فعلي"]): c_act = col
+                if any(k in cs for k in ["code", "كود"]):
+                    c_code = col
+                if any(k in cs for k in ["detail", "name", "صنف", "مادة"]):
+                    c_name = col
+                if any(k in cs for k in ["systemqty", "دفترية", "نظام"]):
+                    c_sys = col
+                if any(k in cs for k in ["actualqty", "فعلي"]):
+                    c_act = col
 
             def get_official_code(row):
                 item_name = str(row[c_name]).strip().lower()
