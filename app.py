@@ -32,12 +32,12 @@ html, body, [class*="css"] {font-family: 'Cairo', sans-serif;}
 """, unsafe_allow_html=True)
 
 st.title("📦 متابعة محمد قطان - نظام إدارة المخازن والجرد الذكي")
-st.caption("النظام المبسط: جرد أصناف الطلب (بالصور، كمية النظام، وخانة الكمية الفعلية) + معادلة الجرد اليومي + تقرير الأسبوع")
+st.caption("النظام المبسط: جرد أصناف الطلب (كمية النظام وخانة الكمية الفعلية) + معادلة الجرد اليومي + تقرير الأسبوع")
 
 main_mode = st.sidebar.radio(
     "📂 الأقسام الرئيسية:",
     [
-        "🛒 جرد الطلبات بالصور والكميات",
+        "🛒 جرد الطلبات والكميات",
         "🧮 معادلة الجرد اليومي المدمج",
         "✅ تقرير ومجموعات جرد الأسبوع"
     ]
@@ -82,11 +82,11 @@ pdf_order_items = [
 ]
 
 # ---------------------------------------------------------
-# 1. قسم جرد الطلبات بالصور والكميات
+# 1. قسم جرد الطلبات والكميات
 # ---------------------------------------------------------
-if main_mode == "🛒 جرد الطلبات بالصور والكميات":
-    st.subheader("🛒 جرد أصناف الطلب (عرض الصور، كمية النظام، وإدخال الكمية الفعلية)")
-    st.caption("ارفع ملف `كميات.xlsx` ليسحب كمية النظام لكل صنف تلقائياً، مع عرض صورة المنتج وخانة فارغة للكمية الفعلية.")
+if main_mode == "🛒 جرد الطلبات والكميات":
+    st.subheader("🛒 جرد أصناف الطلب (كمية النظام وإدخال الكمية الفعلية)")
+    st.caption("ارفع ملف `كميات.xlsx` ليسحب كمية النظام لكل صنف تلقائياً مع خانة لإدخال الكمية الفعلية.")
 
     qty_file = st.file_uploader("📁 ارفع ملف كميات المخزن (كميات.xlsx):", type=["xlsx", "xls"])
 
@@ -94,32 +94,60 @@ if main_mode == "🛒 جرد الطلبات بالصور والكميات":
     if qty_file is not None:
         try:
             df_qty = pd.read_excel(qty_file)
+            # تنظيف أسماء الأعمدة من المسافات الزائدة
+            df_qty.columns = [str(c).strip() for c in df_qty.columns]
             st.success("تم قراءة ملف الكميات بنجاح!")
         except Exception as e:
             st.error(f"خطأ في قراءة الملف: {e}")
 
     if df_qty is not None:
+        # اكتشاف عمود الصنف وعمود الكمية تلقائياً لتجنب KeyError
+        item_col = None
+        qty_col = None
+
+        for col in df_qty.columns:
+            c_lower = col.lower()
+            if any(k in c_lower for k in ["صنف", "اسم", "مادة", "detail", "name", "item"]):
+                if item_col is None:
+                    item_col = col
+            if any(k in c_lower for k in ["كمية", "كميه", "نظام", "حالية", "متاحة", "qty", "quantity", "stock"]):
+                if qty_col is None:
+                    qty_col = col
+
+        # بديل احتياطي إذا لم تتطابق الأسماء
+        if item_col is None:
+            item_col = df_qty.columns[1] if len(df_qty.columns) > 1 else df_qty.columns[0]
+        if qty_col is None:
+            qty_col = df_qty.columns[-1]
+
+        # تنظيف البيانات وتجاهل الصفوف الفارغة
+        df_qty = df_qty.dropna(subset=[item_col]).copy()
+        df_qty[item_col] = df_qty[item_col].astype(str).str.strip()
+        df_qty[qty_col] = pd.to_numeric(df_qty[qty_col], errors="coerce").fillna(0.0)
+
         st.markdown("---")
         inventory_data = []
-        
+        excel_items_list = df_qty[item_col].tolist()
+
         for i, item in enumerate(pdf_order_items):
             system_qty = 0.0
             matched_name = "غير مطابق"
+
             for _, row in df_qty.iterrows():
-                excel_item = str(row['الصنف'])
+                excel_item = row[item_col]
                 if item in excel_item or excel_item in item:
-                    system_qty = float(row['الكمية الحالية'])
+                    system_qty = float(row[qty_col])
                     matched_name = excel_item
                     break
-            if matched_name == "غير مطابق":
-                matches = difflib.get_close_matches(item, df_qty['الصنف'].astype(str).tolist(), n=1, cutoff=0.3)
+
+            if matched_name == "غير مطابق" and excel_items_list:
+                matches = difflib.get_close_matches(item, excel_items_list, n=1, cutoff=0.3)
                 if matches:
-                    matched_row = df_qty[df_qty['الصنف'].astype(str) == matches[0]]
+                    matched_row = df_qty[df_qty[item_col] == matches[0]]
                     if not matched_row.empty:
-                        system_qty = float(matched_row.iloc[0]['الكمية الحالية'])
+                        system_qty = float(matched_row.iloc[0][qty_col])
                         matched_name = matches[0]
 
-            # تصميم بطاقة المنتج مع صورة توضيحية واسم الصنف
             with st.container():
                 st.markdown(f"""
                 <div style="background: #151f32; padding: 12px; border-radius: 10px; border: 1px solid #29364b; margin-bottom: 10px;">
@@ -128,39 +156,32 @@ if main_mode == "🛒 جرد الطلبات بالصور والكميات":
                 </div>
                 """, unsafe_allow_html=True)
 
-                col_img, col_sys, col_act, col_diff = st.columns([1, 2, 2, 2])
-                with col_img:
-                    # عرض صورة مصغرة توضيحية لكل صنف
-                    st.image("https://images.unsplash.com/photo-1586816001966-79b736744398?w=100&auto=format&fit=crop&q=60", width=70)
+                col_sys, col_act = st.columns([1, 1])
                 with col_sys:
                     st.metric("كمية النظام", f"{system_qty}")
                 with col_act:
-                    actual_qty = st.number_input("الكمية الفعلية", min_value=0.0, step=1.0, key=f"act_{i}", label_visibility="collapsed")
-                with col_diff:
-                    diff = actual_qty - system_qty
-                    st.metric("الفرق", f"{diff}", delta=f"{diff}")
+                    actual_qty = st.number_input("الكمية الفعلية", min_value=0.0, step=1.0, key=f"act_{i}")
 
             inventory_data.append({
-                "م": i+1,
+                "م": i + 1,
                 "اسم الصنف": item,
                 "الصنف المطابق بالملف": matched_name,
                 "كمية النظام": system_qty,
-                "الكمية الفعلية": actual_qty,
-                "الفرق": diff
+                "الكمية الفعلية": actual_qty
             })
             st.markdown("---")
 
-        if st.button("💾 حفظ وتصدير تقرير الجرد بالصور (Excel)"):
+        if st.button("💾 حفظ وتصدير تقرير الجرد (Excel)"):
             df_result = pd.DataFrame(inventory_data)
             excel_bytes = convert_df_to_excel(df_result)
             st.download_button(
                 "📥 تحميل تقرير الجرد (Excel)",
                 excel_bytes,
-                "تقرير_جرد_الطلبات_بالصور.xlsx",
+                "تقرير_جرد_الطلبات.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
     else:
-        st.info("👈 يرجى رفع ملف `كميات.xlsx` أعلاه لعرض المنتجات بالصور وربط كميات النظام تلقائياً.")
+        st.info("👈 يرجى رفع ملف `كميات.xlsx` أعلاه لعرض المنتجات وربط كميات النظام تلقائياً.")
 
 # ---------------------------------------------------------
 # 2. معادلة الجرد اليومي المدمج
@@ -170,10 +191,10 @@ elif main_mode == "🧮 معادلة الجرد اليومي المدمج":
     st.caption("ارفع أولاً ملف (رمز المادة الأساسي)، ثم ارفع ملفات الجرد اليومي لاستخراج التقارير بالصيغة المطلوبة.")
 
     master_file = st.file_uploader("📁 1. ارفع الملف الأساسي (رمز المادة.xlsx):", type=["xlsx", "xls"])
-    
+
     eq_files = st.file_uploader(
-        "📁 2. ارفع ملفات الجرد اليومي دفعة واحدة:", 
-        type=["xlsx", "xls", "csv"], 
+        "📁 2. ارفع ملفات الجرد اليومي دفعة واحدة:",
+        type=["xlsx", "xls", "csv"],
         accept_multiple_files=True
     )
 
@@ -240,10 +261,10 @@ elif main_mode == "🧮 معادلة الجرد اليومي المدمج":
             st.success(f"تم دمج وتحليل عدد {len(eq_files)} ملفات بنجاح واستخراج رموز المواد الرسمية!")
 
             eq_tab1, eq_tab2, eq_tab3, eq_tab4, eq_tab5 = st.tabs([
-                "📋 إجمالي الجرد المدمج", 
-                "➕ أصناف الزيادة", 
-                "📉 أصناف الفقد (العجز)", 
-                "📌 رمز الصنف + اسم الصنف + كمية الزيادة", 
+                "📋 إجمالي الجرد المدمج",
+                "➕ أصناف الزيادة",
+                "📉 أصناف الفقد (العجز)",
+                "📌 رمز الصنف + اسم الصنف + كمية الزيادة",
                 "📌 رمز الصنف + اسم الصنف + كمية الفقد"
             ])
 
